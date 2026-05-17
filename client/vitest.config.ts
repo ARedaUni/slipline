@@ -1,11 +1,18 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import { playwright } from '@vitest/browser-playwright';
+import react from '@vitejs/plugin-react'
+import { playwright } from '@vitest/browser-playwright'
+import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [react()],
   test: {
     passWithNoTests: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json-summary', 'lcov'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/main.tsx', 'src/vite-env.d.ts', 'src/**/*.{test,spec}.{ts,tsx}'],
+    },
     projects: [
       {
         plugins: [react()],
@@ -30,4 +37,4 @@ export default defineConfig({
       },
     ],
   },
-});
+})

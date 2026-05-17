@@ -27,3 +27,8 @@ dist-ssr
 tests/**/__screenshots__
 .vitest-cache
 .vitest-attachments
+
+# Coverage + mutation reports
+coverage
+reports
+.stryker-tmp
