@@ -9,6 +9,10 @@ export const step = (
   const nextVy = vy + params.gravity * params.dt
   return {
     velocity: [vx, nextVy, vz],
-    position: [px + vx * params.dt, py + nextVy * params.dt, pz + vz * params.dt],
+    position: [
+      px + vx * params.dt,
+      py + nextVy * params.dt,
+      pz + vz * params.dt,
+    ],
   }
 }
