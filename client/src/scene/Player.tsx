@@ -5,8 +5,11 @@ import { useInput } from '../engine/input/InputContext'
 import { usePhysics } from '../engine/PhysicsContext'
 import { createRapierCharacterBody } from '../engine/rapierAdapter'
 import { buildIntent } from '../sim/intent'
-import { type StepTuning, stepCharacter } from '../sim/step'
-import type { Vec3 } from '../sim/types'
+import {
+  type CharacterState,
+  type StepTuning,
+  stepCharacter,
+} from '../sim/step'
 
 const FIXED_DT = 1 / 60
 const MAX_STEPS_PER_FRAME = 5
@@ -34,8 +37,11 @@ export const Player = () => {
   const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
 
-  const velocityRef = useRef<Vec3>([0, 0, 0])
-  const groundedRef = useRef(false)
+  const stateRef = useRef<CharacterState>({
+    velocity: [0, 0, 0],
+    grounded: false,
+    groundNormal: [0, 1, 0],
+  })
   const accumulatorRef = useRef(0)
 
   const body = useMemo(() => createRapierCharacterBody(physics), [physics])
@@ -56,16 +62,13 @@ export const Player = () => {
           yaw: input.mouse.getLook().yaw,
         })
 
-        const next = stepCharacter(
-          { velocity: velocityRef.current, grounded: groundedRef.current },
+        stateRef.current = stepCharacter(
+          stateRef.current,
           intent,
           body,
           TUNING,
           FIXED_DT,
         )
-
-        velocityRef.current = next.velocity
-        groundedRef.current = next.grounded
       },
       LOOP_OPTS,
     )
