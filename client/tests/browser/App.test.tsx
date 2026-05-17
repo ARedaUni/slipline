@@ -1,14 +1,20 @@
 import { expect, test } from 'vitest'
 import { render } from 'vitest-browser-react'
 import App from '../../src/App'
+import { InputProvider } from '../../src/input/InputContext'
+import { createKeyboard } from '../../src/input/keyboard'
+import { createMouse } from '../../src/input/mouse'
 import { PhysicsProvider } from '../../src/physics/PhysicsContext'
 import { createPhysicsWorld } from '../../src/physics/world'
 
-test('mounts a WebGL canvas when wrapped in PhysicsProvider', async () => {
+test('mounts a WebGL canvas with PhysicsProvider + InputProvider', async () => {
   const world = await createPhysicsWorld()
+  const input = { keyboard: createKeyboard(), mouse: createMouse() }
   const screen = await render(
     <PhysicsProvider value={world}>
-      <App />
+      <InputProvider value={input}>
+        <App />
+      </InputProvider>
     </PhysicsProvider>,
   )
   const canvas = screen.container.querySelector('canvas')
