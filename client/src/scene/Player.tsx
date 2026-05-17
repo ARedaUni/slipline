@@ -1,25 +1,26 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { useInput } from '../input/InputContext'
-import { accelerate, applyFriction } from '../physics/movement'
 import { usePhysics } from '../physics/PhysicsContext'
 import type { Vec3 } from '../physics/types'
+import type { CharacterBody } from '../sim/character'
 import { buildIntent } from '../sim/intent'
+import { type StepTuning, stepCharacter } from '../sim/step'
 
 const FIXED_DT = 1 / 60
 const MAX_STEPS_PER_FRAME = 5
-
-const GRAVITY = -25
-const JUMP_SPEED = 7.5
 const PLAYER_EYE_OFFSET = 0.7
 
-const GROUND_FRICTION = 6
-const GROUND_STOP_SPEED = 1.5
-const GROUND_WISH_SPEED = 8
-const GROUND_ACCEL = 10
-
-const AIR_WISH_SPEED = 1
-const AIR_ACCEL = 100
+const TUNING: StepTuning = {
+  gravity: -25,
+  jumpSpeed: 7.5,
+  groundFriction: 6,
+  groundStopSpeed: 1.5,
+  groundWishSpeed: 8,
+  groundAccel: 10,
+  airWishSpeed: 1,
+  airAccel: 100,
+}
 
 export const Player = () => {
   const physics = usePhysics()
@@ -35,6 +36,27 @@ export const Player = () => {
     accumulatorRef.current += Math.min(delta, MAX_STEPS_PER_FRAME * FIXED_DT)
     physics.world.timestep = FIXED_DT
 
+    // anonymous Rapier adapter for CharacterBody — relocates to
+    // engine/rapierAdapter.ts in the next commit
+    const body: CharacterBody = {
+      tryMove: (desired) => {
+        physics.kcc.computeColliderMovement(physics.playerCollider, {
+          x: desired[0],
+          y: desired[1],
+          z: desired[2],
+        })
+        const corrected = physics.kcc.computedMovement()
+        const pos = physics.player.translation()
+        physics.player.setNextKinematicTranslation({
+          x: pos.x + corrected.x,
+          y: pos.y + corrected.y,
+          z: pos.z + corrected.z,
+        })
+        physics.world.step()
+        return { grounded: physics.kcc.computedGrounded() }
+      },
+    }
+
     while (accumulatorRef.current >= FIXED_DT) {
       const keys = input.keyboard.getKeys()
       const look = input.mouse.getLook()
@@ -47,65 +69,16 @@ export const Player = () => {
         yaw: look.yaw,
       })
 
-      let v = velocityRef.current
+      const next = stepCharacter(
+        { velocity: velocityRef.current, grounded: groundedRef.current },
+        intent,
+        body,
+        TUNING,
+        FIXED_DT,
+      )
 
-      // gravity
-      v = [v[0], v[1] + GRAVITY * FIXED_DT, v[2]]
-
-      // jump: only when grounded; immediately ungrounds
-      if (groundedRef.current && intent.wantsJump) {
-        v = [v[0], JUMP_SPEED, v[2]]
-        groundedRef.current = false
-      }
-
-      // ground branch vs air branch
-      if (groundedRef.current) {
-        v = applyFriction(v, {
-          friction: GROUND_FRICTION,
-          stopSpeed: GROUND_STOP_SPEED,
-          dt: FIXED_DT,
-        })
-        v = accelerate(v, {
-          wishDir: intent.wishDir,
-          wishSpeed: GROUND_WISH_SPEED,
-          accel: GROUND_ACCEL,
-          dt: FIXED_DT,
-        })
-      } else {
-        v = accelerate(v, {
-          wishDir: intent.wishDir,
-          wishSpeed: AIR_WISH_SPEED,
-          accel: AIR_ACCEL,
-          dt: FIXED_DT,
-        })
-      }
-
-      // ask KCC how much of (v * dt) we can actually move
-      physics.kcc.computeColliderMovement(physics.playerCollider, {
-        x: v[0] * FIXED_DT,
-        y: v[1] * FIXED_DT,
-        z: v[2] * FIXED_DT,
-      })
-      const corrected = physics.kcc.computedMovement()
-
-      const pos = physics.player.translation()
-      physics.player.setNextKinematicTranslation({
-        x: pos.x + corrected.x,
-        y: pos.y + corrected.y,
-        z: pos.z + corrected.z,
-      })
-
-      physics.world.step()
-
-      const nowGrounded = physics.kcc.computedGrounded()
-      groundedRef.current = nowGrounded
-
-      // landing: kill downward velocity so gravity doesn't accumulate
-      if (nowGrounded && v[1] < 0) {
-        v = [v[0], 0, v[2]]
-      }
-
-      velocityRef.current = v
+      velocityRef.current = next.velocity
+      groundedRef.current = next.grounded
       accumulatorRef.current -= FIXED_DT
     }
 
