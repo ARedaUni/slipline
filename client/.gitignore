@@ -26,3 +26,4 @@ dist-ssr
 # Vitest browser mode artifacts
 tests/**/__screenshots__
 .vitest-cache
+.vitest-attachments
