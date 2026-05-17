@@ -40,23 +40,20 @@ export const Player = () => {
 
   const body = useMemo(() => createRapierCharacterBody(physics), [physics])
 
-  useFrame((_, delta) => {
-    physics.world.timestep = FIXED_DT
+  // One-shot setup. First-person look needs Y (yaw) before X (pitch), else
+  // pitching while yawed introduces unwanted roll. Three's default is XYZ.
+  useEffect(() => {
+    camera.rotation.order = 'YXZ'
+  }, [camera])
 
+  useFrame((_, delta) => {
     accumulatorRef.current = advanceFixedLoop(
       accumulatorRef.current,
       delta,
       () => {
-        const keys = input.keyboard.getKeys()
-        const look = input.mouse.getLook()
         const intent = buildIntent({
-          forward: keys.forward,
-          back: keys.back,
-          left: keys.left,
-          right: keys.right,
-          jump: keys.jump,
-          crouch: keys.crouch,
-          yaw: look.yaw,
+          ...input.keyboard.getKeys(),
+          yaw: input.mouse.getLook().yaw,
         })
 
         const next = stepCharacter(
@@ -75,9 +72,8 @@ export const Player = () => {
 
     // imperative camera sync — eye at top of capsule, yaw+pitch from mouse
     const t = physics.player.translation()
-    camera.position.set(t.x, t.y + PLAYER_EYE_OFFSET, t.z)
     const look = input.mouse.getLook()
-    camera.rotation.order = 'YXZ'
+    camera.position.set(t.x, t.y + PLAYER_EYE_OFFSET, t.z)
     camera.rotation.set(look.pitch, look.yaw, 0)
   })
 
