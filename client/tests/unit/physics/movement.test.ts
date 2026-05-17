@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyFriction } from '../../../src/physics/movement'
+import { accelerate, applyFriction } from '../../../src/physics/movement'
 import type { Vec3 } from '../../../src/physics/types'
 
 describe('applyFriction (Quake/Source ground friction)', () => {
@@ -82,5 +82,75 @@ describe('applyFriction (Quake/Source ground friction)', () => {
     // next x = 300 * 0.6 = 180, next z = 300 * 0.6 = 180
     expect(next[0]).toBeCloseTo(180, 2)
     expect(next[2]).toBeCloseTo(180, 2)
+  })
+})
+
+describe('accelerate (Quake/Source PM_Accelerate)', () => {
+  it('adds speed in the wish direction when below the cap', () => {
+    // velocity=[0,0,0], wishDir=[1,0,0], wishSpeed=320, accel=10, dt=0.016
+    // currentSpeed = 0
+    // addSpeed    = 320
+    // accelSpeed  = min(10*0.016*320, 320) = min(51.2, 320) = 51.2
+    const next = accelerate([0, 0, 0], {
+      wishDir: [1, 0, 0],
+      wishSpeed: 320,
+      accel: 10,
+      dt: 0.016,
+    })
+
+    expect(next[0]).toBeCloseTo(51.2, 4)
+    expect(next[2]).toBeCloseTo(0, 6)
+  })
+
+  it('does not exceed wishSpeed in the wish direction (clamp via addSpeed)', () => {
+    // velocity already at the cap in the wish direction → addSpeed=0 → no change
+    const next = accelerate([320, 0, 0], {
+      wishDir: [1, 0, 0],
+      wishSpeed: 320,
+      accel: 10,
+      dt: 0.016,
+    })
+
+    expect(next[0]).toBeCloseTo(320, 4)
+  })
+
+  it('never subtracts speed when current speed already exceeds wishSpeed', () => {
+    // velocity boosted past cap (e.g. by jump pad). addSpeed negative → no-op.
+    const next = accelerate([500, 0, 0], {
+      wishDir: [1, 0, 0],
+      wishSpeed: 320,
+      accel: 10,
+      dt: 0.016,
+    })
+
+    expect(next[0]).toBeCloseTo(500, 4)
+  })
+
+  it('adds full accel perpendicular to high-speed velocity (strafe-jump mechanic)', () => {
+    // The whole point of air-accel with low wishSpeed=30:
+    // currentSpeedInWishDir is 0 (perpendicular), so addSpeed = 30 = full air accel.
+    // The forward velocity is untouched — net speed magnitude increases.
+    const next = accelerate([500, 0, 0], {
+      wishDir: [0, 0, 1],
+      wishSpeed: 30,
+      accel: 10,
+      dt: 0.016,
+    })
+
+    expect(next[0]).toBeCloseTo(500, 4)
+    expect(next[2]).toBeCloseTo(4.8, 4)
+  })
+
+  it('does nothing when there is no input (wishSpeed=0)', () => {
+    const next = accelerate([100, -5, 50], {
+      wishDir: [0, 0, 0],
+      wishSpeed: 0,
+      accel: 10,
+      dt: 0.016,
+    })
+
+    expect(next[0]).toBeCloseTo(100, 6)
+    expect(next[1]).toBeCloseTo(-5, 6)
+    expect(next[2]).toBeCloseTo(50, 6)
   })
 })
