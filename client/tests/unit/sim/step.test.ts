@@ -24,6 +24,7 @@ const defaultTuning: StepTuning = {
 const noIntent: MoveIntent = {
   wishDir: [0, 0, 0],
   wantsJump: false,
+  wantsCrouch: false,
 }
 
 type FakeBody = CharacterBody & {
@@ -68,7 +69,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       { velocity: [0, 0, 0], grounded: true },
-      { wishDir: [0, 0, 0], wantsJump: true },
+      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
       body,
       defaultTuning,
       1 / 60,
@@ -86,7 +87,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       { velocity: [0, 0, 0], grounded: false },
-      { wishDir: [0, 0, 0], wantsJump: true },
+      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
       body,
       defaultTuning,
       1 / 60,
@@ -171,7 +172,7 @@ describe('stepCharacter (per-tick character integration)', () => {
     // Upward motion must survive.
     const next = stepCharacter(
       { velocity: [0, 5, 0], grounded: true },
-      { wishDir: [0, 0, 0], wantsJump: true },
+      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
       body,
       defaultTuning,
       1 / 60,
@@ -209,7 +210,7 @@ describe('stepCharacter — deterministic scenarios', () => {
     // tick 0: jump
     state = stepCharacter(
       state,
-      { wishDir: [0, 0, 0], wantsJump: true },
+      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
       // for the jump tick, fake-body grounded=true (we're on the floor)
       fakeBody({ grounded: true }),
       defaultTuning,

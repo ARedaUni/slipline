@@ -55,6 +55,7 @@ export const Player = () => {
           left: keys.left,
           right: keys.right,
           jump: keys.jump,
+          crouch: keys.crouch,
           yaw: look.yaw,
         })
 
