@@ -65,7 +65,7 @@ describe('stepCharacter (per-tick character integration)', () => {
   })
 
   it('jumps when grounded + wantsJump: sets vy to jumpSpeed and ungrounds', () => {
-    const body = fakeBody({ grounded: true })
+    const body = fakeBody({ grounded: true, groundNormal: [0, 1, 0] })
 
     const next = stepCharacter(
       { velocity: [0, 0, 0], grounded: true },
@@ -98,7 +98,7 @@ describe('stepCharacter (per-tick character integration)', () => {
   })
 
   it('on ground branch: applies friction (horizontal velocity decays)', () => {
-    const body = fakeBody({ grounded: true })
+    const body = fakeBody({ grounded: true, groundNormal: [0, 1, 0] })
 
     const next = stepCharacter(
       { velocity: [8, 0, 0], grounded: true },
@@ -149,7 +149,7 @@ describe('stepCharacter (per-tick character integration)', () => {
   })
 
   it('zeroes downward vy on landing (prevents gravity accumulation while grounded)', () => {
-    const body = fakeBody({ grounded: true })
+    const body = fakeBody({ grounded: true, groundNormal: [0, 1, 0] })
 
     const next = stepCharacter(
       { velocity: [0, -10, 0], grounded: false },
@@ -165,7 +165,7 @@ describe('stepCharacter (per-tick character integration)', () => {
   })
 
   it('does not clamp upward vy on landing (a jump frame should rise)', () => {
-    const body = fakeBody({ grounded: true })
+    const body = fakeBody({ grounded: true, groundNormal: [0, 1, 0] })
 
     // edge case: we're already moving up but body still reports grounded
     // (e.g. mid-jump, before kcc has registered separation).
@@ -212,7 +212,7 @@ describe('stepCharacter — deterministic scenarios', () => {
       state,
       { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
       // for the jump tick, fake-body grounded=true (we're on the floor)
-      fakeBody({ grounded: true }),
+      fakeBody({ grounded: true, groundNormal: [0, 1, 0] }),
       defaultTuning,
       1 / 60,
     )
