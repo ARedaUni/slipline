@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { applyMouseDelta, type LookState } from '../../../src/input/mouse'
+import {
+  applyMouseDelta,
+  type LookState,
+} from '../../../../src/engine/input/mouse'
 
 const atRest = (overrides: Partial<LookState> = {}): LookState => ({
   yaw: 0,

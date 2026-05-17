@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext } from 'react'
-import type { PhysicsWorld } from './world'
+import type { PhysicsWorld } from './physicsWorld'
 
 const PhysicsContext = createContext<PhysicsWorld | null>(null)
 

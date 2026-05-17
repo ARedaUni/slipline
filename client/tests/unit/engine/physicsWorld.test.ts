@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPhysicsWorld } from '../../../src/physics/world'
+import { createPhysicsWorld } from '../../../src/engine/physicsWorld'
 
 describe('createPhysicsWorld — kinematic player capsule', () => {
   it('exposes a kinematic-position-based rigid body as `player`', async () => {
