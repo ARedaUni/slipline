@@ -6,32 +6,45 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
     "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run --project=unit",
-    "test:browser": "vitest run --project=browser"
+    "test:browser": "vitest run --project=browser",
+    "test:coverage": "vitest run --project=unit --coverage",
+    "stryker": "stryker run",
+    "license:check": "license-checker-rseidelsohn --production --excludePrivatePackages --onlyAllow 'MIT;MIT-0;Apache-2.0;ISC;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;CC-BY-3.0;CC-BY-4.0;Unlicense;Python-2.0;BlueOak-1.0.0;MPL-2.0'"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@biomejs/biome",
+      "esbuild"
+    ]
   },
   "dependencies": {
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@biomejs/biome": "^2.4.15",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/browser-playwright": "^4.1.6",
-    "eslint": "^10.3.0",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.6.0",
+    "@vitest/coverage-v8": "^4.1.6",
+    "license-checker-rseidelsohn": "^4.4.2",
     "playwright": "^1.60.0",
     "typescript": "~6.0.2",
-    "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",
     "vitest": "^4.1.6",
     "vitest-browser-react": "^2.2.0"
