@@ -1,12 +1,13 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import type { Mesh } from 'three'
-import { createWorld, type PhysicsWorld } from './world'
+import { usePhysics } from '../physics/PhysicsContext'
 
 const FIXED_DT = 1 / 60
 const MAX_STEPS_PER_FRAME = 5
 
-const FallingCube = ({ physics }: { physics: PhysicsWorld }) => {
+const FallingCube = () => {
+  const physics = usePhysics()
   const meshRef = useRef<Mesh>(null)
   const accumulatorRef = useRef(0)
 
@@ -40,26 +41,12 @@ const Ground = () => (
   </mesh>
 )
 
-export const Scene = () => {
-  const [physics, setPhysics] = useState<PhysicsWorld | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    createWorld().then((p) => {
-      if (!cancelled) setPhysics(p)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  return (
-    <Canvas camera={{ position: [6, 5, 8], fov: 55 }} shadows>
-      <color attach="background" args={['#16171d']} />
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[5, 10, 5]} intensity={1.2} castShadow />
-      <Ground />
-      {physics && <FallingCube physics={physics} />}
-    </Canvas>
-  )
-}
+export const Scene = () => (
+  <Canvas camera={{ position: [6, 5, 8], fov: 55 }} shadows>
+    <color attach="background" args={['#16171d']} />
+    <ambientLight intensity={0.4} />
+    <directionalLight position={[5, 10, 5]} intensity={1.2} castShadow />
+    <Ground />
+    <FallingCube />
+  </Canvas>
+)

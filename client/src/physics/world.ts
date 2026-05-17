@@ -5,7 +5,7 @@ export type PhysicsWorld = {
   readonly cube: RAPIER.RigidBody
 }
 
-export const createWorld = async (): Promise<PhysicsWorld> => {
+export const createPhysicsWorld = async (): Promise<PhysicsWorld> => {
   await RAPIER.init()
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
 
