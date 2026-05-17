@@ -194,6 +194,7 @@ jobs:
       - osv-scan
     steps:
       - name: Check gate
+        working-directory: .
         run: |
           FAILED=0
           check() { [[ "$2" == "success" ]] || { echo "FAIL: $1 ($2)"; FAILED=1; }; }
