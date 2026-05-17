@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { accelerate, applyFriction } from '../../../src/physics/movement'
-import type { Vec3 } from '../../../src/physics/types'
+import { accelerate, applyFriction } from '../../../src/sim/movement'
+import type { Vec3 } from '../../../src/sim/types'
 
 describe('applyFriction (Quake/Source ground friction)', () => {
   it('decays speed using max(speed, stopSpeed) when above stopSpeed', () => {

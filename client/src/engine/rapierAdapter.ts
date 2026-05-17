@@ -1,5 +1,5 @@
-import type { PhysicsWorld } from '../physics/world'
 import type { CharacterBody } from '../sim/character'
+import type { PhysicsWorld } from './physicsWorld'
 
 // Adapter (Cockburn): implements the sim's CharacterBody port against
 // Rapier's KinematicCharacterController + RigidBody. The sim never sees

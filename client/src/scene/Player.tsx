@@ -1,12 +1,12 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import { advanceFixedLoop } from '../engine/fixedLoop'
+import { useInput } from '../engine/input/InputContext'
+import { usePhysics } from '../engine/PhysicsContext'
 import { createRapierCharacterBody } from '../engine/rapierAdapter'
-import { useInput } from '../input/InputContext'
-import { usePhysics } from '../physics/PhysicsContext'
-import type { Vec3 } from '../physics/types'
 import { buildIntent } from '../sim/intent'
 import { type StepTuning, stepCharacter } from '../sim/step'
+import type { Vec3 } from '../sim/types'
 
 const FIXED_DT = 1 / 60
 const MAX_STEPS_PER_FRAME = 5

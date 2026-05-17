@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { codeToAction } from '../../../src/input/keyboard'
+import { codeToAction } from '../../../../src/engine/input/keyboard'
 
 describe('codeToAction (semantic key mapping)', () => {
   it('maps WASD to movement actions', () => {

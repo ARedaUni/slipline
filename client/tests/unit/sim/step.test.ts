@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import type { Vec3 } from '../../../src/physics/types'
 import type {
   CharacterBody,
   CollisionResponse,
@@ -7,6 +6,7 @@ import type {
 import type { MoveIntent } from '../../../src/sim/intent'
 import type { StepTuning } from '../../../src/sim/step'
 import { stepCharacter } from '../../../src/sim/step'
+import type { Vec3 } from '../../../src/sim/types'
 
 // Mirrors Player.tsx's current constants so behavior is preserved
 // between in-component logic and the extracted stepCharacter.

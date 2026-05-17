@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { step } from '../../../src/physics/integrator'
-import type { KinematicState } from '../../../src/physics/types'
+import { step } from '../../../src/sim/integrator'
+import type { KinematicState } from '../../../src/sim/types'
 
 const atRest = (overrides: Partial<KinematicState> = {}): KinematicState => ({
   position: [0, 10, 0],

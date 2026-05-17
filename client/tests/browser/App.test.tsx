@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest'
 import { render } from 'vitest-browser-react'
 import App from '../../src/App'
-import { InputProvider } from '../../src/input/InputContext'
-import { createKeyboard } from '../../src/input/keyboard'
-import { createMouse } from '../../src/input/mouse'
-import { PhysicsProvider } from '../../src/physics/PhysicsContext'
-import { createPhysicsWorld } from '../../src/physics/world'
+import { InputProvider } from '../../src/engine/input/InputContext'
+import { createKeyboard } from '../../src/engine/input/keyboard'
+import { createMouse } from '../../src/engine/input/mouse'
+import { PhysicsProvider } from '../../src/engine/PhysicsContext'
+import { createPhysicsWorld } from '../../src/engine/physicsWorld'
 
 test('mounts a WebGL canvas with PhysicsProvider + InputProvider', async () => {
   const world = await createPhysicsWorld()

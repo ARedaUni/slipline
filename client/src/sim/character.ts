@@ -1,4 +1,4 @@
-import type { Vec3 } from '../physics/types'
+import type { Vec3 } from './types'
 
 export type CollisionResponse = Readonly<{
   grounded: boolean

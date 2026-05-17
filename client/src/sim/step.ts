@@ -1,7 +1,7 @@
-import { accelerate, applyFriction } from '../physics/movement'
-import type { Vec3 } from '../physics/types'
 import type { CharacterBody } from './character'
 import type { MoveIntent } from './intent'
+import { accelerate, applyFriction } from './movement'
+import type { Vec3 } from './types'
 
 export type CharacterState = Readonly<{
   velocity: Vec3
