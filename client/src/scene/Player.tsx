@@ -4,6 +4,7 @@ import { useInput } from '../input/InputContext'
 import { accelerate, applyFriction } from '../physics/movement'
 import { usePhysics } from '../physics/PhysicsContext'
 import type { Vec3 } from '../physics/types'
+import { buildIntent } from '../sim/intent'
 
 const FIXED_DT = 1 / 60
 const MAX_STEPS_PER_FRAME = 5
@@ -37,18 +38,14 @@ export const Player = () => {
     while (accumulatorRef.current >= FIXED_DT) {
       const keys = input.keyboard.getKeys()
       const look = input.mouse.getLook()
-
-      // WASD → world-space wish direction, rotated by camera yaw
-      const fwd = (keys.forward ? 1 : 0) - (keys.back ? 1 : 0)
-      const strafe = (keys.right ? 1 : 0) - (keys.left ? 1 : 0)
-      const cosY = Math.cos(look.yaw)
-      const sinY = Math.sin(look.yaw)
-      // camera default looks down -Z; +yaw rotates left
-      const wishX = fwd * -sinY + strafe * cosY
-      const wishZ = fwd * -cosY + strafe * -sinY
-      const wishLen = Math.sqrt(wishX * wishX + wishZ * wishZ)
-      const wishDir: Vec3 =
-        wishLen > 1e-6 ? [wishX / wishLen, 0, wishZ / wishLen] : [0, 0, 0]
+      const intent = buildIntent({
+        forward: keys.forward,
+        back: keys.back,
+        left: keys.left,
+        right: keys.right,
+        jump: keys.jump,
+        yaw: look.yaw,
+      })
 
       let v = velocityRef.current
 
@@ -56,7 +53,7 @@ export const Player = () => {
       v = [v[0], v[1] + GRAVITY * FIXED_DT, v[2]]
 
       // jump: only when grounded; immediately ungrounds
-      if (groundedRef.current && keys.jump) {
+      if (groundedRef.current && intent.wantsJump) {
         v = [v[0], JUMP_SPEED, v[2]]
         groundedRef.current = false
       }
@@ -69,14 +66,14 @@ export const Player = () => {
           dt: FIXED_DT,
         })
         v = accelerate(v, {
-          wishDir,
+          wishDir: intent.wishDir,
           wishSpeed: GROUND_WISH_SPEED,
           accel: GROUND_ACCEL,
           dt: FIXED_DT,
         })
       } else {
         v = accelerate(v, {
-          wishDir,
+          wishDir: intent.wishDir,
           wishSpeed: AIR_WISH_SPEED,
           accel: AIR_ACCEL,
           dt: FIXED_DT,
