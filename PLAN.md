@@ -4,12 +4,12 @@
 
 You want a multi-week project that flexes **scalable real-time systems design**, with a game as the vehicle. The chosen shape:
 
-- 3D shared-arena ".io-style" game (Three.js client, Go backend)
+- 3D shared-arena ".io-style" game (React Three Fiber client, Go backend)
 - Momentum-driven movement: **sliding + grappling hook** (think Titanfall × agar.io)
 - Designed to support **~10k concurrent players** through horizontal scaling
 - We will *architect* for 10k from day one but *build* outward in tight increments — each phase ends in a runnable game
 
-Working dir is empty (`/Users/jimmy/Desktop/personal_engineering/game`) — true greenfield.
+Working dir holds a scaffolded client (Vite + React 19 + R3F + vanilla Rapier) with CI in place. First slice (1.1) merged via PR #7 — see "Phased Execution" for current state.
 
 Outcome: a deployed (or deploy-ready) 3D arena game that you understand end-to-end across browser physics, authoritative server simulation, matchmaking, pub/sub, persistence, and horizontal scale-out.
 
@@ -31,7 +31,7 @@ The mechanics list is intentionally open. You'll iterate on feel in Phase 1.
 ```
    ┌──────────────┐         ┌─────────────┐
    │  Browser     │ ─wss──▶ │  Gateway    │ ── HTTP ─▶ Matchmaker
-   │ (Three.js +  │         │  (Go)       │              │
+   │ (R3F +       │         │  (Go)       │              │
    │  Rapier)     │ ◀─wss── │             │              ▼
    └──────────────┘         └──────┬──────┘         ┌─────────┐
                                    │                 │  Redis  │ ◀── pub/sub
@@ -58,16 +58,37 @@ The mechanics list is intentionally open. You'll iterate on feel in Phase 1.
 7. **Postgres for cold state** (accounts, match history, cosmetics). Redis for **hot ephemeral** (sessions, presence, matchmaking queue, leaderboards via sorted sets). No game-tick state ever touches a DB — only memory.
 8. **Server-side physics**: custom, *constrained to what the game needs* (capsule character controller, raycast for grapple, swept-sphere collisions vs static arena geo). Do **not** port Rapier/Bullet to Go — too much yak-shaving. Reuse: client uses Rapier.js for prediction, server runs a Go re-implementation of the *same equations* so prediction matches.
 9. **Observability from week 2**: structured logs (slog), Prometheus metrics (tick duration, ws msg/sec, room count, dropped packets), pprof endpoint always on. You cannot reason about scale without seeing it.
+10. **Physics simulation lives outside React's lifecycle.** The Rapier world is a module-level singleton bootstrapped once in `main.tsx` via `await createPhysicsWorld()`, then handed to the tree via a `<PhysicsProvider>` + `usePhysics()` hook. *Why:* React's contract (UI = pure function of state, mounts/unmounts cheaply) is incompatible with physics' contract (sequential, non-idempotent state machine that must never be reset). StrictMode's intentional double-mount caused real WASM traps when the world was owned by `useEffect`. The DI-via-Context pattern keeps the seam clean — tests inject mock worlds at the Provider, future replay/spectator scopes can mount a separate world subtree, and non-React code (a Web Worker bootstrap later) can import the same factory.
+11. **Movement model: Quake/Source equations on top of Rapier primitives.** Rapier handles solved-problem geometry (capsule-vs-mesh sweep, raycasts, collision response via `KinematicCharacterController`). We write the velocity equations ourselves — input → friction → ground/air acceleration → slide impulse → grapple spring. This is what every shooter does; movement *feel* is the game and no library provides it. Canonical references: Quake3 `bg_pmove.c`, Source `gamemovement.cpp`. Total custom physics we own: ~500 lines, scoped to player + grapple. We use **vanilla `@dimforge/rapier3d-compat`**, not `@react-three/rapier` — the wrapper has a known StrictMode bug (issue #118) and hides the imperative seam we need for snapshot replay and reconciliation.
+12. **Fixed-dt accumulator at 60 Hz on the client; 20 Hz authoritative server tick.** Pattern from Glenn Fiedler's "Fix Your Timestep!" Client steps physics at 60 Hz inside `useFrame` with `while (acc >= dt) step()` and a per-frame step cap to prevent the spiral-of-death on slow tabs. Same semi-implicit Euler equations will be byte-identical on the Go server. `client/src/physics/integrator.ts` is deliberately framework-free for exactly this port.
+
+---
+
+## Architectural conventions (decided, enforced from Slice 1.1)
+
+These emerged from the first runnable slice and apply for the rest of the project. Violations should be treated as bugs.
+
+- **Physics is owned outside React.** Singleton in `main.tsx`, Context for delivery, `usePhysics()` hook for access. Tests inject worlds via the Provider — never via `vi.mock`.
+- **Pure modules are framework-free.** `physics/integrator.ts` (and future `physics/movement.ts`, `physics/snapshot.ts`) import nothing from React/Three/Rapier. They are the layer that ports verbatim to the Go server.
+- **React must not re-render in the tick loop.** Per-frame entity transforms are written imperatively to `ref.current.position` / `.quaternion` inside `useFrame`. React reconciles only when entities enter/leave the scene (mount/unmount), never when they move.
+- **TDD non-negotiable for physics & netcode.** Every equation, every snapshot encode/decode, every reconciliation rewind has a failing test before the code. The integrator's three RED-GREEN tests are the template.
+- **Test architecture: jsdom for pure modules, Playwright (`vitest-browser-react`) for canvas + integration.** Pure module tests run in <100ms; we keep them fast and ubiquitous. Browser tests bootstrap real Rapier WASM (~800ms) — slower but high-fidelity.
+- **Wire protocol versions before code stabilises.** JSON during dev (debuggable), protobuf at the end of Phase 2. Hand-rolled binary only if benchmarks demand it.
+- **Server authority is the only anti-cheat.** Client predicts, server validates and reconciles. No client trusts another client. Ever.
+- **Formatter strict on readability over terseness.** Biome `lineWidth: 80` — multi-arg typed function signatures wrap naturally; single-line collapse is rejected.
 
 ---
 
 ## Tech Stack
 
 **Client** (`/client`):
-- TypeScript (strict), Vite
-- Three.js for rendering
-- Rapier.js (WASM) for client-side physics prediction
-- Plain WebSocket API (no socket.io — it abstracts away exactly what we want to learn)
+- TypeScript (strict mode), Vite, React 19
+- **React Three Fiber** for declarative scene composition. React lives only at the UI / scene-graph layer — never inside the physics tick loop.
+- **`@dimforge/rapier3d-compat`** (vanilla, *not* `@react-three/rapier`). Reasons in decision #11.
+- **Biome** for lint + format (`lineWidth: 80`, multi-line typed signatures enforced).
+- **Vitest** — unit (jsdom) for pure modules, browser (Playwright via `vitest-browser-react`) for canvas mount + integration.
+- **Stryker** mutation testing wired in (`pnpm stryker`) for high-value pure modules — pays off once netcode logic lands in Phase 2.
+- Plain WebSocket API (no socket.io — it abstracts away exactly what we want to learn).
 
 **Server** (`/server`):
 - Go 1.22+
@@ -84,17 +105,32 @@ The mechanics list is intentionally open. You'll iterate on feel in Phase 1.
 
 **Repo layout (monorepo):**
 ```
-/client          Three.js + TS
-/server
+/client                            R3F + Rapier + TS
+  /src
+    /physics                       pure modules + Rapier world factory + DI provider
+      integrator.ts                semi-implicit Euler (pure, ports to Go)
+      types.ts                     Vec3, KinematicState, IntegrationParams
+      world.ts                     createPhysicsWorld() factory
+      PhysicsContext.tsx           <PhysicsProvider> + usePhysics() hook
+      movement.ts                  (Slice 1.2) Quake/Source velocity equations
+      snapshot.ts                  (Phase 2) entity snapshot + delta
+    /scene                         R3F Canvas + per-entity components
+      Scene.tsx                    <Canvas>, lights, camera, useFrame tick
+    main.tsx                       async bootstrap: createPhysicsWorld → render
+    App.tsx                        thin root, renders <Scene />
+  /tests
+    /unit                          jsdom; pure module tests (<100ms)
+    /browser                       Playwright; canvas mount + integration
+/server                            (Phase 2+)
   /cmd
-    /gateway     edge ws handler
-    /matchmaker  queue & room assignment
-    /gameserver  room host (tick loop)
+    /gateway                       edge ws handler
+    /matchmaker                    queue & room assignment
+    /gameserver                    room host (tick loop)
   /internal
-    /game        shared sim code (physics, entities, snapshot)
-    /proto       wire protocol
-    /transport   ws helpers
-/infra           docker-compose, scripts
+    /game                          shared sim code (physics, entities, snapshot)
+    /proto                         wire protocol
+    /transport                     ws helpers
+/infra                             docker-compose, scripts (Phase 3+)
 ```
 
 ---
@@ -105,13 +141,33 @@ Each phase ends with **a runnable game**. Do not advance until current phase pla
 
 ### Phase 1 — Single-player feel (week 1)
 Goal: nail the movement before anything multiplayer matters. If the game doesn't feel good solo, multiplayer won't save it.
-- Three.js scene: simple arena (boxes, ramps, a few platforms)
-- Capsule character controller with Rapier.js
-- WASD + mouselook + jump + **crouch-slide** (apply downhill momentum, reduce friction)
-- **Grappling hook**: raycast → attach point → spring constraint → release
-- Movement-tuning UI (sliders for friction, slide impulse, grapple stiffness)
 
-Verify: you can run a loop around the arena in under 30s using slide+grapple chains and it feels juicy.
+**Slice 1.1 — Scaffold (DONE ✅, PR #7)**
+- R3F `<Canvas>` mounts a scene with a Rapier-driven falling cube on a static floor
+- Pure `integrator.ts` module with semi-implicit Euler — 3 TDD'd unit tests (gravity acceleration; vertical position via post-update velocity; horizontal position·dt)
+- Physics bootstrapped once outside React (`createPhysicsWorld()` in `main.tsx`); delivered via `<PhysicsProvider>` + `usePhysics()` — fixes the StrictMode double-mount WASM trap
+- Browser smoke test (Playwright) asserts canvas mounts under the Provider
+- Fixed-dt accumulator (60 Hz) in `useFrame` with a per-frame step cap
+
+**Slice 1.2 — Kinematic player controller (NEXT)**
+- Player as a capsule using Rapier's `KinematicCharacterController` (collision response against arena geo)
+- Input layer: WASD key state + pointer lock + mouselook (yaw + pitch). Module-level singleton, exposed via a hook for the player component.
+- Velocity update written **test-first** against canonical Quake/Source equations in a new `physics/movement.ts`:
+  - Ground friction (linear decay below max speed)
+  - Ground acceleration (clamp to max speed along input direction)
+  - Air acceleration (the famous Quake "strafe-jump" formulation — accel only in the *new* direction, preserves momentum)
+  - Jump impulse + gravity from Rapier
+- First-person camera follows the capsule via imperative ref-sync in `useFrame` (no React re-render on movement)
+
+Verify: capsule moves smoothly, collides correctly with the floor, cannot fall through. Strafe-jump preserves horizontal momentum across consecutive jumps. Movement equations unit-tested independent of Rapier.
+
+**Slice 1.3 — Arena + slide + grapple**
+- Replace the placeholder floor with a small hand-built arena (boxes, ramps, a wall worth grappling onto). One mesh; no procedural generation.
+- **Crouch-slide**: friction reduction + downslope-projected impulse (constant force along the slope tangent)
+- **Grapple hook**: raycast → attach point → spring force. First pass: hand-rolled Hookean spring on the capsule's velocity (`F = -k·Δx - c·v`); reuse Rapier joint only if the hand-rolled spring feels wrong.
+- Movement-tuning HUD (React DOM overlay *outside* the Canvas — keeps physics clean): sliders for friction, slide impulse magnitude, grapple stiffness/damping.
+
+Verify: you can run a loop around the arena in under 30s using slide+grapple chains and it feels juicy. Tuning sliders dialed in. Recordings of "feels good" sessions saved for regression-by-eye in Phase 2.
 
 ### Phase 2 — Authoritative server, single room (week 2)
 Goal: prove the netcode model on one room before scaling out.
@@ -160,14 +216,29 @@ Reuse these *concepts*; do not pull a netcode library. The whole point is to int
 
 ---
 
-## Critical Files (will exist; none yet)
+## Critical Files
 
-- `client/src/physics.ts` — character controller, must match server math exactly
-- `server/internal/game/physics.go` — Go port of same equations
-- `server/internal/game/snapshot.go` — entity snapshot + delta encoding
-- `server/internal/game/room.go` — tick loop, the heart of the server
-- `server/internal/proto/` — wire protocol
-- `infra/docker-compose.yml` — local multi-service rig
+**Client (exists today, Slice 1.1)**
+- `client/src/physics/integrator.ts` — pure kinematic step (semi-implicit Euler). Framework-free. Mirrors what `server/internal/game/physics.go` will run.
+- `client/src/physics/types.ts` — `Vec3`, `KinematicState`, `IntegrationParams`. Readonly tuples and objects only.
+- `client/src/physics/world.ts` — Rapier world factory (`createPhysicsWorld()`). Called once from `main.tsx`. Will grow to own the player body, arena colliders, joints.
+- `client/src/physics/PhysicsContext.tsx` — DI provider + `usePhysics()` hook. The seam tests inject through.
+- `client/src/scene/Scene.tsx` — R3F `<Canvas>`. Owns camera, lighting, per-entity components. Imperative ref-sync inside `useFrame`.
+- `client/src/main.tsx` — async bootstrap: awaits `createPhysicsWorld()` before the first React render.
+
+**Client (next slices)**
+- `client/src/physics/movement.ts` (Slice 1.2) — Quake/Source velocity equations. Pure. Will be ported to Go.
+- `client/src/input/keyboard.ts` (Slice 1.2) — key-state singleton, exposed via a hook.
+- `client/src/physics/grapple.ts` (Slice 1.3) — raycast + spring constraint.
+
+**Server (Phase 2+)**
+- `server/internal/game/physics.go` — Go port of `integrator.ts` and `movement.ts`. Must match byte-for-byte for prediction to reconcile.
+- `server/internal/game/snapshot.go` — entity snapshot + delta encoding.
+- `server/internal/game/room.go` — tick loop, the heart of the server.
+- `server/internal/proto/` — wire protocol (JSON → protobuf).
+
+**Infra (Phase 3+)**
+- `infra/docker-compose.yml` — local multi-service rig (gateway, matchmaker, game servers, Redis, Postgres).
 
 ---
 
