@@ -5,8 +5,11 @@ import { useInput } from '../engine/input/InputContext'
 import { usePhysics } from '../engine/PhysicsContext'
 import { createRapierCharacterBody } from '../engine/rapierAdapter'
 import { buildIntent } from '../sim/intent'
-import { type StepTuning, stepCharacter } from '../sim/step'
-import type { Vec3 } from '../sim/types'
+import {
+  type CharacterState,
+  type StepTuning,
+  stepCharacter,
+} from '../sim/step'
 
 const FIXED_DT = 1 / 60
 const MAX_STEPS_PER_FRAME = 5
@@ -21,6 +24,7 @@ const TUNING: StepTuning = {
   groundAccel: 10,
   airWishSpeed: 1,
   airAccel: 100,
+  grapple: { restLength: 5, stiffness: 40, damping: 4 },
 }
 
 const LOOP_OPTS = {
@@ -34,49 +38,56 @@ export const Player = () => {
   const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
 
-  const velocityRef = useRef<Vec3>([0, 0, 0])
-  const groundedRef = useRef(false)
+  // Seed state.position from Rapier's spawn translation so sim and
+  // engine agree from tick 0. After this, stepCharacter writes position
+  // from each tryMove response, keeping them in lock-step.
+  const stateRef = useRef<CharacterState>(
+    ((): CharacterState => {
+      const t = physics.player.translation()
+      return {
+        position: [t.x, t.y, t.z],
+        velocity: [0, 0, 0],
+        grounded: false,
+        groundNormal: [0, 1, 0],
+        grapple: { attached: false },
+      }
+    })(),
+  )
   const accumulatorRef = useRef(0)
 
   const body = useMemo(() => createRapierCharacterBody(physics), [physics])
 
-  useFrame((_, delta) => {
-    physics.world.timestep = FIXED_DT
+  // One-shot setup. First-person look needs Y (yaw) before X (pitch), else
+  // pitching while yawed introduces unwanted roll. Three's default is XYZ.
+  useEffect(() => {
+    camera.rotation.order = 'YXZ'
+  }, [camera])
 
+  useFrame((_, delta) => {
     accumulatorRef.current = advanceFixedLoop(
       accumulatorRef.current,
       delta,
       () => {
-        const keys = input.keyboard.getKeys()
-        const look = input.mouse.getLook()
         const intent = buildIntent({
-          forward: keys.forward,
-          back: keys.back,
-          left: keys.left,
-          right: keys.right,
-          jump: keys.jump,
-          yaw: look.yaw,
+          ...input.keyboard.getKeys(),
+          yaw: input.mouse.getLook().yaw,
         })
 
-        const next = stepCharacter(
-          { velocity: velocityRef.current, grounded: groundedRef.current },
+        stateRef.current = stepCharacter(
+          stateRef.current,
           intent,
           body,
           TUNING,
           FIXED_DT,
         )
-
-        velocityRef.current = next.velocity
-        groundedRef.current = next.grounded
       },
       LOOP_OPTS,
     )
 
     // imperative camera sync — eye at top of capsule, yaw+pitch from mouse
     const t = physics.player.translation()
-    camera.position.set(t.x, t.y + PLAYER_EYE_OFFSET, t.z)
     const look = input.mouse.getLook()
-    camera.rotation.order = 'YXZ'
+    camera.position.set(t.x, t.y + PLAYER_EYE_OFFSET, t.z)
     camera.rotation.set(look.pitch, look.yaw, 0)
   })
 

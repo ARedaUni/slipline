@@ -6,12 +6,14 @@ export type IntentInput = Readonly<{
   left: boolean
   right: boolean
   jump: boolean
+  crouch: boolean
   yaw: number
 }>
 
 export type MoveIntent = Readonly<{
   wishDir: Vec3
   wantsJump: boolean
+  wantsCrouch: boolean
 }>
 
 const EPSILON = 1e-6
@@ -29,5 +31,5 @@ export const buildIntent = (
   const len = Math.sqrt(wishX * wishX + wishZ * wishZ)
   const wishDir: Vec3 =
     len > EPSILON ? [wishX / len, 0, wishZ / len] : [0, 0, 0]
-  return { wishDir, wantsJump: input.jump }
+  return { wishDir, wantsJump: input.jump, wantsCrouch: input.crouch }
 }
