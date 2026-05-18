@@ -1,3 +1,4 @@
+import type { AnchorProbe } from './anchorProbe'
 import type { Vec3 } from './types'
 
 // A grapple is a damped Hookean spring tether between the player and an
@@ -60,4 +61,26 @@ export const grappleAcceleration = (
   const radialAccel = springMag - tuning.damping * vRadial
 
   return [radialAccel * ux, radialAccel * uy, radialAccel * uz]
+}
+
+// State transition: given a fire request, ask the AnchorProbe whether
+// the world offers something to attach to in that direction within
+// maxRange. On hit, the next state is attached at the hit point; on
+// miss, the next state is detached.
+//
+// The prior state is intentionally NOT read: each call re-resolves from
+// the current world via the probe, so re-firing while already attached
+// either reattaches at a fresh anchor (hit) or detaches (miss). This is
+// the idempotency rule — same inputs, same result, regardless of history.
+// biome-ignore format: multi-line signature keeps typed params readable
+export const fireGrapple = (
+  _state: GrappleState,
+  origin: Vec3,
+  direction: Vec3,
+  maxRange: number,
+  probe: AnchorProbe,
+): GrappleState => {
+  const hit = probe.findAnchor(origin, direction, maxRange)
+  if (!hit.found) return { attached: false }
+  return { attached: true, anchor: hit.point }
 }

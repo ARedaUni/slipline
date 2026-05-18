@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest'
+import type { AnchorHit, AnchorProbe } from '../../../src/sim/anchorProbe'
 import {
+  fireGrapple,
   type GrappleState,
   type GrappleTuning,
   grappleAcceleration,
 } from '../../../src/sim/grapple'
 import type { Vec3 } from '../../../src/sim/types'
+
+// A FakeAnchorProbe lets the sim test express "the world says yes/no"
+// without booting Rapier. The probe ignores its inputs and returns the
+// canned hit it was constructed with — exactly the shape adapters are
+// allowed to vary on.
+const fakeProbe = (hit: AnchorHit): AnchorProbe => ({
+  findAnchor: () => hit,
+})
 
 const ZERO: Vec3 = [0, 0, 0]
 
@@ -111,5 +121,22 @@ describe('grappleAcceleration', () => {
     expect(a[0]).toBeCloseTo(200, 5)
     expect(a[1]).toBeCloseTo(0, 6)
     expect(a[2]).toBeCloseTo(0, 6)
+  })
+})
+
+describe('fireGrapple', () => {
+  // Bullets (a) + (e): fire from an origin in a direction; when the
+  // AnchorProbe reports a hit, the resulting state is attached at the
+  // hit point. The sim relays the question to its port — it does NOT
+  // decide what counts as reachable. That decision belongs to the
+  // adapter (Rapier raycast filters, mask, fixture flags) — keeping
+  // engine concepts out of the domain (bullet (d)).
+  it('attaches at the hit point when the probe finds an anchor', () => {
+    const state: GrappleState = { attached: false }
+    const probe = fakeProbe({ found: true, point: [10, 5, 0] })
+
+    const next = fireGrapple(state, [0, 0, 0], [1, 0, 0], 50, probe)
+
+    expect(next).toEqual({ attached: true, anchor: [10, 5, 0] })
   })
 })
