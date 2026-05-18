@@ -139,4 +139,44 @@ describe('fireGrapple', () => {
 
     expect(next).toEqual({ attached: true, anchor: [10, 5, 0] })
   })
+
+  // The other side of bullet (a): firing into empty space stays
+  // detached. This is what makes (b) load-bearing — without an anchor,
+  // grappleAcceleration has no spring to apply, so no pull happens.
+  it('stays detached when the probe finds no anchor', () => {
+    const state: GrappleState = { attached: false }
+    const probe = fakeProbe({ found: false })
+
+    const next = fireGrapple(state, [0, 0, 0], [1, 0, 0], 50, probe)
+
+    expect(next).toEqual({ attached: false })
+  })
+
+  // Idempotency / re-probe rule: re-firing while already attached must
+  // re-ask the probe, not return the prior state. This test would FAIL
+  // under a plausibly-wrong "no-op when already attached" implementation
+  // (if (state.attached) return state) — which is exactly the kind of
+  // optimisation a future change might mistakenly add.
+  it('overwrites the old anchor when re-fired and the probe hits', () => {
+    const state: GrappleState = { attached: true, anchor: [10, 5, 0] }
+    const probe = fakeProbe({ found: true, point: [-3, 8, 2] })
+
+    const next = fireGrapple(state, [0, 0, 0], [-1, 0, 0], 50, probe)
+
+    expect(next).toEqual({ attached: true, anchor: [-3, 8, 2] })
+  })
+
+  // Idempotency continued: re-firing while attached and missing
+  // clears the prior anchor — the player drops. Without this rule,
+  // a miss while already attached would silently preserve the rope,
+  // which is the wrong feel: pressing fire is a request to re-resolve,
+  // and a re-resolve that finds nothing means there's nothing to hold.
+  it('detaches when re-fired and the probe misses', () => {
+    const state: GrappleState = { attached: true, anchor: [10, 5, 0] }
+    const probe = fakeProbe({ found: false })
+
+    const next = fireGrapple(state, [0, 0, 0], [0, 1, 0], 50, probe)
+
+    expect(next).toEqual({ attached: false })
+  })
 })
