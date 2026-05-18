@@ -24,6 +24,7 @@ const TUNING: StepTuning = {
   groundAccel: 10,
   airWishSpeed: 1,
   airAccel: 100,
+  grapple: { restLength: 5, stiffness: 40, damping: 4 },
 }
 
 const LOOP_OPTS = {
@@ -48,6 +49,7 @@ export const Player = () => {
         velocity: [0, 0, 0],
         grounded: false,
         groundNormal: [0, 1, 0],
+        grapple: { attached: false },
       }
     })(),
   )

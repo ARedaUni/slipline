@@ -1,4 +1,5 @@
 import type { CharacterBody } from './character'
+import type { GrappleState, GrappleTuning } from './grapple'
 import type { MoveIntent } from './intent'
 import { accelerate, applyFriction } from './movement'
 import type { Vec3 } from './types'
@@ -16,6 +17,11 @@ export type CharacterState = Readonly<{
   // Last known surface normal. Meaningful only while grounded; carried
   // across ticks so the slide branch can read it before tryMove runs.
   groundNormal: Vec3
+  // Current grapple attachment. Owned by the intent/event layer
+  // (fireGrapple / releaseGrapple); stepCharacter reads it but does
+  // not transition between attached/detached. When attached, the spring
+  // acceleration composes with the rest of the step (bullet c).
+  grapple: GrappleState
 }>
 
 export type StepTuning = Readonly<{
@@ -27,6 +33,11 @@ export type StepTuning = Readonly<{
   groundAccel: number
   airWishSpeed: number
   airAccel: number
+  // Tuning for the grapple spring; consumed by stepCharacter when
+  // state.grapple is attached. Lives here so all per-tick tuning sits
+  // in one object (StepTuning is the canonical place for numbers a
+  // designer would dial — see the Anti-patterns rule in CLAUDE.md).
+  grapple: GrappleTuning
 }>
 
 // Removes the component of v perpendicular to n: v - (v·n)·n. On a
@@ -98,5 +109,11 @@ export const stepCharacter = (
     v = [v[0], 0, v[2]]
   }
 
-  return { position, velocity: v, grounded, groundNormal }
+  return {
+    position,
+    velocity: v,
+    grounded,
+    groundNormal,
+    grapple: state.grapple,
+  }
 }
