@@ -308,6 +308,32 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
   })
 })
 
+describe('stepCharacter — grapple composition', () => {
+  // Bullet (c) foundation: when state.grapple is attached, the damped
+  // spring acceleration from sim/grapple composes into velocity each
+  // tick. Anchor 10m along +x, restLength 5, stiffness 40 → extension
+  // 5, spring magnitude k·x = 200 along +x̂. Zero velocity means the
+  // damping term is zero, so dv = 200·dt cleanly.
+  it('applies grapple spring acceleration to velocity when attached', () => {
+    const body = fakeBody({ grounded: false })
+    const dt = 1 / 60
+
+    const next = stepCharacter(
+      state({
+        position: [0, 0, 0],
+        velocity: [0, 0, 0],
+        grapple: { attached: true, anchor: [10, 0, 0] },
+      }),
+      noIntent,
+      body,
+      defaultTuning,
+      dt,
+    )
+
+    expect(next.velocity[0]).toBeCloseTo(200 * dt, 6)
+  })
+})
+
 describe('stepCharacter — deterministic scenarios', () => {
   it('30-frame straight-up jump reaches expected apex (sim-only, no Rapier)', () => {
     // Scripted: ground at y=0, jump on frame 0, then track vy over time.

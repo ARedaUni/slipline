@@ -1,5 +1,9 @@
 import type { CharacterBody } from './character'
-import type { GrappleState, GrappleTuning } from './grapple'
+import {
+  type GrappleState,
+  type GrappleTuning,
+  grappleAcceleration,
+} from './grapple'
 import type { MoveIntent } from './intent'
 import { accelerate, applyFriction } from './movement'
 import type { Vec3 } from './types'
@@ -92,6 +96,19 @@ export const stepCharacter = (
       dt,
     })
   }
+
+  // Grapple force composes on top of the input/friction branches (bullet
+  // c: the spring is felt regardless of ground/air state). When detached,
+  // grappleAcceleration returns ZERO so this is a no-op — no branch
+  // needed. Order matches Quake3 bg_pmove.c: external forces after
+  // input-driven accel, before the collision sweep.
+  const ga = grappleAcceleration(
+    state.grapple,
+    state.position,
+    v,
+    tuning.grapple,
+  )
+  v = [v[0] + ga[0] * dt, v[1] + ga[1] * dt, v[2] + ga[2] * dt]
 
   const desired: Vec3 = [v[0] * dt, v[1] * dt, v[2] * dt]
   const response = body.tryMove(desired)
