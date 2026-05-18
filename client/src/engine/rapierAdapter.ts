@@ -52,12 +52,15 @@ export const createRapierCharacterBody = (
       z: pos.z + corrected.z,
     })
     physics.world.step()
+    const after = physics.player.translation()
+    const position: Vec3 = [after.x, after.y, after.z]
     if (!physics.kcc.computedGrounded()) {
-      return { grounded: false }
+      return { grounded: false, position }
     }
     return {
       grounded: true,
       groundNormal: queryGroundNormal(physics.kcc),
+      position,
     }
   },
 })

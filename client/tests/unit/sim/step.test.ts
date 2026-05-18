@@ -33,6 +33,7 @@ const UP: Vec3 = [0, 1, 0]
 // supply the fields they actually care about; everything else is the
 // "at rest, standing on flat ground" baseline.
 const state = (overrides: Partial<CharacterState> = {}): CharacterState => ({
+  position: [0, 0, 0],
   velocity: [0, 0, 0],
   grounded: false,
   groundNormal: UP,
@@ -44,11 +45,23 @@ type FakeBody = CharacterBody & {
   readonly callCount: () => number
 }
 
+// Scripted-response input: callers supply only the contact info; the
+// helper fills in `position` so existing tests don't need to repeat
+// a placeholder on every call site. Tests that care about position
+// can override it explicitly via the second arg.
+type ResponseInput =
+  | Readonly<{ grounded: false }>
+  | Readonly<{ grounded: true; groundNormal: Vec3 }>
+
 // Test adapter: a CharacterBody that records the desired move
 // and returns a scripted collision response.
-const fakeBody = (response: CollisionResponse): FakeBody => {
+const fakeBody = (
+  input: ResponseInput,
+  position: Vec3 = [0, 0, 0],
+): FakeBody => {
   let last: Vec3 | null = null
   let calls = 0
+  const response: CollisionResponse = { ...input, position }
   return {
     tryMove: (desired) => {
       last = desired

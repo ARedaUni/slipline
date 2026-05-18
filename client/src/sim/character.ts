@@ -12,8 +12,8 @@ import type { Vec3 } from './types'
 // while airborne.
 
 export type CollisionResponse =
-  | Readonly<{ grounded: false }>
-  | Readonly<{ grounded: true; groundNormal: Vec3 }>
+  | Readonly<{ grounded: false; position: Vec3 }>
+  | Readonly<{ grounded: true; groundNormal: Vec3; position: Vec3 }>
 
 export type CharacterBody = {
   readonly tryMove: (desired: Vec3) => CollisionResponse

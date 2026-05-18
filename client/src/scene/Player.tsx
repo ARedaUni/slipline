@@ -37,11 +37,20 @@ export const Player = () => {
   const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
 
-  const stateRef = useRef<CharacterState>({
-    velocity: [0, 0, 0],
-    grounded: false,
-    groundNormal: [0, 1, 0],
-  })
+  // Seed state.position from Rapier's spawn translation so sim and
+  // engine agree from tick 0. After this, stepCharacter writes position
+  // from each tryMove response, keeping them in lock-step.
+  const stateRef = useRef<CharacterState>(
+    ((): CharacterState => {
+      const t = physics.player.translation()
+      return {
+        position: [t.x, t.y, t.z],
+        velocity: [0, 0, 0],
+        grounded: false,
+        groundNormal: [0, 1, 0],
+      }
+    })(),
+  )
   const accumulatorRef = useRef(0)
 
   const body = useMemo(() => createRapierCharacterBody(physics), [physics])

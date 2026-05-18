@@ -4,6 +4,13 @@ import { accelerate, applyFriction } from './movement'
 import type { Vec3 } from './types'
 
 export type CharacterState = Readonly<{
+  // World-space position. The sim owns position (alongside velocity)
+  // so that the same step logic runs server-authoritatively in the
+  // future Go port, where Rapier does not exist. On the client, the
+  // CharacterBody adapter reports the post-collision-correction
+  // position via the response, and stepCharacter writes it here —
+  // keeping sim and Rapier in lock-step within a tick.
+  position: Vec3
   velocity: Vec3
   grounded: boolean
   // Last known surface normal. Meaningful only while grounded; carried
@@ -77,6 +84,7 @@ export const stepCharacter = (
 
   const desired: Vec3 = [v[0] * dt, v[1] * dt, v[2] * dt]
   const response = body.tryMove(desired)
+  const position = response.position
   grounded = response.grounded
   if (response.grounded) {
     groundNormal = response.groundNormal
@@ -90,5 +98,5 @@ export const stepCharacter = (
     v = [v[0], 0, v[2]]
   }
 
-  return { velocity: v, grounded, groundNormal }
+  return { position, velocity: v, grounded, groundNormal }
 }
