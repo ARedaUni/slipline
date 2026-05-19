@@ -10,6 +10,7 @@ const baseInput = {
   crouch: false,
   fireGrapple: false,
   yaw: 0,
+  pitch: 0,
 }
 
 describe('buildIntent (input → domain MoveIntent)', () => {

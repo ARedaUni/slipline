@@ -14,10 +14,17 @@ export type IntentInput = Readonly<{
   // track input history.
   fireGrapple: boolean
   yaw: number
+  pitch: number
 }>
 
 export type MoveIntent = Readonly<{
   wishDir: Vec3
+  // World-space unit vector the player is aiming at (eye direction).
+  // Used by the sim to dispatch the grapple raycast. Computed in
+  // buildIntent from yaw + pitch under Three.js's YXZ Euler convention:
+  // at (yaw=0, pitch=0) the player looks down -Z. Positive pitch looks
+  // up; positive yaw rotates view to the left (camera-space convention).
+  lookDir: Vec3
   wantsJump: boolean
   wantsCrouch: boolean
   firedGrapple: boolean
@@ -38,8 +45,18 @@ export const buildIntent = (
   const len = Math.sqrt(wishX * wishX + wishZ * wishZ)
   const wishDir: Vec3 =
     len > EPSILON ? [wishX / len, 0, wishZ / len] : [0, 0, 0]
+  // YXZ-Euler view-forward: at (yaw=0, pitch=0) we point down -Z. Pitch
+  // rotates around the X axis (positive = look up → +Y component);
+  // yaw rotates around the Y axis (positive = camera turns left → forward
+  // gains a -X component). Same sign convention as the wishDir math
+  // above. Always unit-length because (cosP, sinP) and (cosY, sinY) are
+  // each unit pairs; the AnchorProbe contract relies on this.
+  const cosP = Math.cos(input.pitch)
+  const sinP = Math.sin(input.pitch)
+  const lookDir: Vec3 = [-sinY * cosP, sinP, -cosY * cosP]
   return {
     wishDir,
+    lookDir,
     wantsJump: input.jump,
     wantsCrouch: input.crouch,
     firedGrapple: input.fireGrapple,

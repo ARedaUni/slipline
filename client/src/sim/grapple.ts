@@ -21,6 +21,10 @@ export type GrappleTuning = Readonly<{
   stiffness: number
   // Viscous damping coefficient c in F = -c·v_radial. Higher = less yo-yo.
   damping: number
+  // Maximum reach of the grapple — passed to AnchorProbe.findAnchor.
+  // Beyond this distance the probe reports a miss and fireGrapple
+  // returns detached.
+  maxRange: number
 }>
 
 const ZERO: Vec3 = [0, 0, 0]

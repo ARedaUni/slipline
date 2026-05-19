@@ -24,7 +24,7 @@ const TUNING: StepTuning = {
   groundAccel: 10,
   airWishSpeed: 1,
   airAccel: 100,
-  grapple: { restLength: 5, stiffness: 40, damping: 4 },
+  grapple: { restLength: 5, stiffness: 40, damping: 4, maxRange: 20 },
 }
 
 const LOOP_OPTS = {
@@ -68,9 +68,11 @@ export const Player = () => {
       accumulatorRef.current,
       delta,
       () => {
+        const look = input.mouse.getLook()
         const intent = buildIntent({
           ...input.keyboard.getKeys(),
-          yaw: input.mouse.getLook().yaw,
+          yaw: look.yaw,
+          pitch: look.pitch,
           fireGrapple: false,
         })
 

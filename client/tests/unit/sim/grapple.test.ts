@@ -22,6 +22,7 @@ const defaultTuning: GrappleTuning = {
   restLength: 5,
   stiffness: 40,
   damping: 4,
+  maxRange: 50,
 }
 
 describe('grappleAcceleration', () => {

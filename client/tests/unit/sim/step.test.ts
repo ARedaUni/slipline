@@ -19,11 +19,12 @@ const defaultTuning: StepTuning = {
   groundAccel: 10,
   airWishSpeed: 1,
   airAccel: 100,
-  grapple: { restLength: 5, stiffness: 40, damping: 4 },
+  grapple: { restLength: 5, stiffness: 40, damping: 4, maxRange: 50 },
 }
 
 const noIntent: MoveIntent = {
   wishDir: [0, 0, 0],
+  lookDir: [0, 0, -1],
   wantsJump: false,
   wantsCrouch: false,
   firedGrapple: false,
@@ -93,6 +94,7 @@ describe('stepCharacter (per-tick character integration)', () => {
       state({ grounded: true }),
       {
         wishDir: [0, 0, 0],
+        lookDir: [0, 0, -1],
         wantsJump: true,
         wantsCrouch: false,
         firedGrapple: false,
@@ -116,6 +118,7 @@ describe('stepCharacter (per-tick character integration)', () => {
       state(),
       {
         wishDir: [0, 0, 0],
+        lookDir: [0, 0, -1],
         wantsJump: true,
         wantsCrouch: false,
         firedGrapple: false,
@@ -206,6 +209,7 @@ describe('stepCharacter (per-tick character integration)', () => {
       state({ velocity: [0, 5, 0], grounded: true }),
       {
         wishDir: [0, 0, 0],
+        lookDir: [0, 0, -1],
         wantsJump: true,
         wantsCrouch: false,
         firedGrapple: false,
@@ -244,6 +248,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
   const crouchIntent: MoveIntent = {
     wishDir: [0, 0, 0],
+    lookDir: [0, 0, -1],
     wantsJump: false,
     wantsCrouch: true,
     firedGrapple: false,
@@ -364,6 +369,7 @@ describe('stepCharacter — deterministic scenarios', () => {
       s,
       {
         wishDir: [0, 0, 0],
+        lookDir: [0, 0, -1],
         wantsJump: true,
         wantsCrouch: false,
         firedGrapple: false,
