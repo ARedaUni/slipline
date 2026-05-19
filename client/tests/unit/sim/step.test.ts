@@ -22,13 +22,20 @@ const defaultTuning: StepTuning = {
   grapple: { restLength: 5, stiffness: 40, damping: 4, maxRange: 50 },
 }
 
-const noIntent: MoveIntent = {
+// Factory: build a MoveIntent with sensible defaults (at rest, no
+// inputs, looking forward). Mirrors the state() factory below.
+// Extracted from inline literals once the Data Clumps smell became
+// concrete during the type-widening commit — the same shape was being
+// constructed at six sites, each with a small variation. Beck's Tidy
+// First trigger: the next change was awkward without it.
+const intent = (overrides: Partial<MoveIntent> = {}): MoveIntent => ({
   wishDir: [0, 0, 0],
   lookDir: [0, 0, -1],
   wantsJump: false,
   wantsCrouch: false,
   firedGrapple: false,
-}
+  ...overrides,
+})
 
 const UP: Vec3 = [0, 1, 0]
 
@@ -81,7 +88,7 @@ describe('stepCharacter (per-tick character integration)', () => {
   it('applies gravity to vertical velocity each tick', () => {
     const body = fakeBody({ grounded: false })
 
-    const next = stepCharacter(state(), noIntent, body, defaultTuning, 1 / 60)
+    const next = stepCharacter(state(), intent(), body, defaultTuning, 1 / 60)
 
     // vy += gravity * dt = -25 * (1/60) ≈ -0.4167
     expect(next.velocity[1]).toBeCloseTo(-25 / 60, 6)
@@ -92,13 +99,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state({ grounded: true }),
-      {
-        wishDir: [0, 0, 0],
-        lookDir: [0, 0, -1],
-        wantsJump: true,
-        wantsCrouch: false,
-        firedGrapple: false,
-      },
+      intent({ wantsJump: true }),
       body,
       defaultTuning,
       1 / 60,
@@ -116,13 +117,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state(),
-      {
-        wishDir: [0, 0, 0],
-        lookDir: [0, 0, -1],
-        wantsJump: true,
-        wantsCrouch: false,
-        firedGrapple: false,
-      },
+      intent({ wantsJump: true }),
       body,
       defaultTuning,
       1 / 60,
@@ -137,7 +132,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state({ velocity: [8, 0, 0], grounded: true }),
-      noIntent,
+      intent(),
       body,
       defaultTuning,
       1 / 60,
@@ -153,7 +148,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state({ velocity: [8, 0, 0] }),
-      noIntent,
+      intent(),
       body,
       defaultTuning,
       1 / 60,
@@ -169,7 +164,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     stepCharacter(
       state({ velocity: [4, 0, -3] }),
-      noIntent,
+      intent(),
       body,
       defaultTuning,
       dt,
@@ -188,7 +183,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state({ velocity: [0, -10, 0] }),
-      noIntent,
+      intent(),
       body,
       defaultTuning,
       1 / 60,
@@ -207,13 +202,7 @@ describe('stepCharacter (per-tick character integration)', () => {
     // Upward motion must survive.
     const next = stepCharacter(
       state({ velocity: [0, 5, 0], grounded: true }),
-      {
-        wishDir: [0, 0, 0],
-        lookDir: [0, 0, -1],
-        wantsJump: true,
-        wantsCrouch: false,
-        firedGrapple: false,
-      },
+      intent({ wantsJump: true }),
       body,
       defaultTuning,
       1 / 60,
@@ -228,7 +217,7 @@ describe('stepCharacter (per-tick character integration)', () => {
   it('calls body.tryMove exactly once per step', () => {
     const body = fakeBody({ grounded: false })
 
-    stepCharacter(state(), noIntent, body, defaultTuning, 1 / 60)
+    stepCharacter(state(), intent(), body, defaultTuning, 1 / 60)
 
     expect(body.callCount()).toBe(1)
   })
@@ -237,7 +226,7 @@ describe('stepCharacter (per-tick character integration)', () => {
     const slope: Vec3 = [-0.5, 0.866, 0]
     const body = fakeBody({ grounded: true, groundNormal: slope })
 
-    const next = stepCharacter(state(), noIntent, body, defaultTuning, 1 / 60)
+    const next = stepCharacter(state(), intent(), body, defaultTuning, 1 / 60)
 
     expect(next.groundNormal[0]).toBeCloseTo(slope[0], 6)
     expect(next.groundNormal[1]).toBeCloseTo(slope[1], 6)
@@ -246,13 +235,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 })
 
 describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
-  const crouchIntent: MoveIntent = {
-    wishDir: [0, 0, 0],
-    lookDir: [0, 0, -1],
-    wantsJump: false,
-    wantsCrouch: true,
-    firedGrapple: false,
-  }
+  const crouchIntent: MoveIntent = intent({ wantsCrouch: true })
 
   it('skips ground friction on flat ground: horizontal momentum preserved', () => {
     const body = fakeBody({ grounded: true, groundNormal: UP })
@@ -346,7 +329,7 @@ describe('stepCharacter — grapple composition', () => {
         velocity: [0, 0, 0],
         grapple: { attached: true, anchor: [10, 0, 0] },
       }),
-      noIntent,
+      intent(),
       body,
       defaultTuning,
       dt,
@@ -367,13 +350,7 @@ describe('stepCharacter — deterministic scenarios', () => {
     // tick 0: jump
     s = stepCharacter(
       s,
-      {
-        wishDir: [0, 0, 0],
-        lookDir: [0, 0, -1],
-        wantsJump: true,
-        wantsCrouch: false,
-        firedGrapple: false,
-      },
+      intent({ wantsJump: true }),
       // for the jump tick, fake-body grounded=true (we're on the floor)
       fakeBody({ grounded: true, groundNormal: UP }),
       defaultTuning,
@@ -385,7 +362,7 @@ describe('stepCharacter — deterministic scenarios', () => {
 
     // simulate falling: 17 more frames, body says NOT grounded
     for (let i = 0; i < 17; i++) {
-      s = stepCharacter(s, noIntent, airBody, defaultTuning, 1 / 60)
+      s = stepCharacter(s, intent(), airBody, defaultTuning, 1 / 60)
     }
 
     // after 17 ticks of gravity, vy = 7.5 + (-25)*(17/60) ≈ 7.5 - 7.083 ≈ 0.417
