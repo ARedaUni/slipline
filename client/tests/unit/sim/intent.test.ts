@@ -8,6 +8,7 @@ const baseInput = {
   right: false,
   jump: false,
   crouch: false,
+  fireGrapple: false,
   yaw: 0,
 }
 
@@ -116,5 +117,16 @@ describe('buildIntent (input → domain MoveIntent)', () => {
     const intent = buildIntent(baseInput)
 
     expect(intent.wantsCrouch).toBe(false)
+  })
+
+  // Grapple fire is an edge event at the DOM layer (mousedown). The engine
+  // input adapter is responsible for translating "click happened" into a
+  // single-tick pulse on IntentInput.fireGrapple; buildIntent just forwards
+  // that pulse onto MoveIntent.firedGrapple. The sim never sees input
+  // history — it sees a flag that already means "fire this tick".
+  it('forwards fireGrapple pulse as firedGrapple=true', () => {
+    const intent = buildIntent({ ...baseInput, fireGrapple: true })
+
+    expect(intent.firedGrapple).toBe(true)
   })
 })

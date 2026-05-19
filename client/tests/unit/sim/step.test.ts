@@ -26,6 +26,7 @@ const noIntent: MoveIntent = {
   wishDir: [0, 0, 0],
   wantsJump: false,
   wantsCrouch: false,
+  firedGrapple: false,
 }
 
 const UP: Vec3 = [0, 1, 0]
@@ -90,7 +91,12 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state({ grounded: true }),
-      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
+      {
+        wishDir: [0, 0, 0],
+        wantsJump: true,
+        wantsCrouch: false,
+        firedGrapple: false,
+      },
       body,
       defaultTuning,
       1 / 60,
@@ -108,7 +114,12 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state(),
-      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
+      {
+        wishDir: [0, 0, 0],
+        wantsJump: true,
+        wantsCrouch: false,
+        firedGrapple: false,
+      },
       body,
       defaultTuning,
       1 / 60,
@@ -193,7 +204,12 @@ describe('stepCharacter (per-tick character integration)', () => {
     // Upward motion must survive.
     const next = stepCharacter(
       state({ velocity: [0, 5, 0], grounded: true }),
-      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
+      {
+        wishDir: [0, 0, 0],
+        wantsJump: true,
+        wantsCrouch: false,
+        firedGrapple: false,
+      },
       body,
       defaultTuning,
       1 / 60,
@@ -230,6 +246,7 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
     wishDir: [0, 0, 0],
     wantsJump: false,
     wantsCrouch: true,
+    firedGrapple: false,
   }
 
   it('skips ground friction on flat ground: horizontal momentum preserved', () => {
@@ -345,7 +362,12 @@ describe('stepCharacter — deterministic scenarios', () => {
     // tick 0: jump
     s = stepCharacter(
       s,
-      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
+      {
+        wishDir: [0, 0, 0],
+        wantsJump: true,
+        wantsCrouch: false,
+        firedGrapple: false,
+      },
       // for the jump tick, fake-body grounded=true (we're on the floor)
       fakeBody({ grounded: true, groundNormal: UP }),
       defaultTuning,

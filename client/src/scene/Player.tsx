@@ -71,6 +71,7 @@ export const Player = () => {
         const intent = buildIntent({
           ...input.keyboard.getKeys(),
           yaw: input.mouse.getLook().yaw,
+          fireGrapple: false,
         })
 
         stateRef.current = stepCharacter(

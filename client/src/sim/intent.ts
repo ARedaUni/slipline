@@ -7,6 +7,12 @@ export type IntentInput = Readonly<{
   right: boolean
   jump: boolean
   crouch: boolean
+  // Edge pulse: true on exactly the tick a fire-grapple event happened
+  // (e.g. mousedown on the client). The engine input adapter is
+  // responsible for translating its medium's native edges (DOM events,
+  // network commands, …) into this single-tick flag. The sim does not
+  // track input history.
+  fireGrapple: boolean
   yaw: number
 }>
 
@@ -14,6 +20,7 @@ export type MoveIntent = Readonly<{
   wishDir: Vec3
   wantsJump: boolean
   wantsCrouch: boolean
+  firedGrapple: boolean
 }>
 
 const EPSILON = 1e-6
@@ -31,5 +38,10 @@ export const buildIntent = (
   const len = Math.sqrt(wishX * wishX + wishZ * wishZ)
   const wishDir: Vec3 =
     len > EPSILON ? [wishX / len, 0, wishZ / len] : [0, 0, 0]
-  return { wishDir, wantsJump: input.jump, wantsCrouch: input.crouch }
+  return {
+    wishDir,
+    wantsJump: input.jump,
+    wantsCrouch: input.crouch,
+    firedGrapple: input.fireGrapple,
+  }
 }
