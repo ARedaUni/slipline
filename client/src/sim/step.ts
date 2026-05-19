@@ -1,5 +1,7 @@
+import type { AnchorProbe } from './anchorProbe'
 import type { CharacterBody } from './character'
 import {
+  fireGrapple,
   type GrappleState,
   type GrappleTuning,
   grappleAcceleration,
@@ -57,6 +59,7 @@ export const stepCharacter = (
   state: CharacterState,
   intent: MoveIntent,
   body: CharacterBody,
+  probe: AnchorProbe,
   tuning: StepTuning,
   dt: number,
 ): CharacterState => {
@@ -66,6 +69,22 @@ export const stepCharacter = (
   // Snapshot whether this tick is a slide; jump can flip grounded below,
   // but the post-move landing clamp still needs to know we were sliding.
   const sliding = grounded && intent.wantsCrouch
+
+  // Grapple dispatch — runs before the force composition below so the
+  // spring engages on the same tick the player fires (no one-tick delay
+  // between click and pull). fireGrapple re-resolves from the world on
+  // every call (see grapple.ts), so re-firing while attached either
+  // re-anchors or detaches, exactly as the idempotency rule prescribes.
+  let grapple: GrappleState = state.grapple
+  if (intent.firedGrapple) {
+    grapple = fireGrapple(
+      grapple,
+      state.position,
+      intent.lookDir,
+      tuning.grapple.maxRange,
+      probe,
+    )
+  }
 
   // gravity
   v = [v[0], v[1] + tuning.gravity * dt, v[2]]
@@ -102,12 +121,7 @@ export const stepCharacter = (
   // grappleAcceleration returns ZERO so this is a no-op — no branch
   // needed. Order matches Quake3 bg_pmove.c: external forces after
   // input-driven accel, before the collision sweep.
-  const ga = grappleAcceleration(
-    state.grapple,
-    state.position,
-    v,
-    tuning.grapple,
-  )
+  const ga = grappleAcceleration(grapple, state.position, v, tuning.grapple)
   v = [v[0] + ga[0] * dt, v[1] + ga[1] * dt, v[2] + ga[2] * dt]
 
   const desired: Vec3 = [v[0] * dt, v[1] * dt, v[2] * dt]
@@ -131,6 +145,6 @@ export const stepCharacter = (
     velocity: v,
     grounded,
     groundNormal,
-    grapple: state.grapple,
+    grapple,
   }
 }

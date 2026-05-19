@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { AnchorProbe } from '../../../src/sim/anchorProbe'
 import type {
   CharacterBody,
   CollisionResponse,
@@ -36,6 +37,13 @@ const intent = (overrides: Partial<MoveIntent> = {}): MoveIntent => ({
   firedGrapple: false,
   ...overrides,
 })
+
+// Null probe: stepCharacter requires a probe for the AnchorProbe port,
+// but tests in this file never fire the grapple (firedGrapple is false
+// throughout). The probe is wired in but never invoked. Tests that
+// care about grapple dispatch should pass their own fakeProbe — see
+// grapple.test.ts for the canonical pattern.
+const nullProbe: AnchorProbe = { findAnchor: () => ({ found: false }) }
 
 const UP: Vec3 = [0, 1, 0]
 
@@ -88,7 +96,14 @@ describe('stepCharacter (per-tick character integration)', () => {
   it('applies gravity to vertical velocity each tick', () => {
     const body = fakeBody({ grounded: false })
 
-    const next = stepCharacter(state(), intent(), body, defaultTuning, 1 / 60)
+    const next = stepCharacter(
+      state(),
+      intent(),
+      body,
+      nullProbe,
+      defaultTuning,
+      1 / 60,
+    )
 
     // vy += gravity * dt = -25 * (1/60) ≈ -0.4167
     expect(next.velocity[1]).toBeCloseTo(-25 / 60, 6)
@@ -101,6 +116,7 @@ describe('stepCharacter (per-tick character integration)', () => {
       state({ grounded: true }),
       intent({ wantsJump: true }),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -119,6 +135,7 @@ describe('stepCharacter (per-tick character integration)', () => {
       state(),
       intent({ wantsJump: true }),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -134,6 +151,7 @@ describe('stepCharacter (per-tick character integration)', () => {
       state({ velocity: [8, 0, 0], grounded: true }),
       intent(),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -150,6 +168,7 @@ describe('stepCharacter (per-tick character integration)', () => {
       state({ velocity: [8, 0, 0] }),
       intent(),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -166,6 +185,7 @@ describe('stepCharacter (per-tick character integration)', () => {
       state({ velocity: [4, 0, -3] }),
       intent(),
       body,
+      nullProbe,
       defaultTuning,
       dt,
     )
@@ -185,6 +205,7 @@ describe('stepCharacter (per-tick character integration)', () => {
       state({ velocity: [0, -10, 0] }),
       intent(),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -204,6 +225,7 @@ describe('stepCharacter (per-tick character integration)', () => {
       state({ velocity: [0, 5, 0], grounded: true }),
       intent({ wantsJump: true }),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -217,7 +239,7 @@ describe('stepCharacter (per-tick character integration)', () => {
   it('calls body.tryMove exactly once per step', () => {
     const body = fakeBody({ grounded: false })
 
-    stepCharacter(state(), intent(), body, defaultTuning, 1 / 60)
+    stepCharacter(state(), intent(), body, nullProbe, defaultTuning, 1 / 60)
 
     expect(body.callCount()).toBe(1)
   })
@@ -226,7 +248,14 @@ describe('stepCharacter (per-tick character integration)', () => {
     const slope: Vec3 = [-0.5, 0.866, 0]
     const body = fakeBody({ grounded: true, groundNormal: slope })
 
-    const next = stepCharacter(state(), intent(), body, defaultTuning, 1 / 60)
+    const next = stepCharacter(
+      state(),
+      intent(),
+      body,
+      nullProbe,
+      defaultTuning,
+      1 / 60,
+    )
 
     expect(next.groundNormal[0]).toBeCloseTo(slope[0], 6)
     expect(next.groundNormal[1]).toBeCloseTo(slope[1], 6)
@@ -244,6 +273,7 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
       state({ velocity: [8, 0, 0], grounded: true }),
       crouchIntent,
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -264,6 +294,7 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
       state({ grounded: true, groundNormal: normal }),
       crouchIntent,
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -288,6 +319,7 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
       state({ velocity: sliding, grounded: true, groundNormal: normal }),
       crouchIntent,
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -303,6 +335,7 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
       state({ velocity: [8, 0, 0] }),
       crouchIntent,
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -331,6 +364,7 @@ describe('stepCharacter — grapple composition', () => {
       }),
       intent(),
       body,
+      nullProbe,
       defaultTuning,
       dt,
     )
@@ -353,6 +387,7 @@ describe('stepCharacter — deterministic scenarios', () => {
       intent({ wantsJump: true }),
       // for the jump tick, fake-body grounded=true (we're on the floor)
       fakeBody({ grounded: true, groundNormal: UP }),
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -362,7 +397,7 @@ describe('stepCharacter — deterministic scenarios', () => {
 
     // simulate falling: 17 more frames, body says NOT grounded
     for (let i = 0; i < 17; i++) {
-      s = stepCharacter(s, intent(), airBody, defaultTuning, 1 / 60)
+      s = stepCharacter(s, intent(), airBody, nullProbe, defaultTuning, 1 / 60)
     }
 
     // after 17 ticks of gravity, vy = 7.5 + (-25)*(17/60) ≈ 7.5 - 7.083 ≈ 0.417
