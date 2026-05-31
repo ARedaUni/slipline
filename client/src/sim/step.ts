@@ -92,6 +92,16 @@ export const stepCharacter = (
       probe,
     )
   }
+  // Rising edge of hold-to-grapple: not held last tick, held now.
+  if (!state.wasAttachIntentHeld && intent.wantsAttach) {
+    grapple = fireGrapple(
+      grapple,
+      state.position,
+      intent.lookDir,
+      tuning.grapple.maxRange,
+      probe,
+    )
+  }
   // Falling edge of hold-to-grapple: was held last tick, released now.
   if (state.wasAttachIntentHeld && !intent.wantsAttach) {
     grapple = releaseGrapple(grapple)

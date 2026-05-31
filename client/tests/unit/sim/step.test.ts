@@ -349,6 +349,13 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
 })
 
 describe('stepCharacter — grapple input edges (hold-to-grapple)', () => {
+  // Hit-returning probe for rising-edge dispatch. fireGrapple needs
+  // a probe answer to decide attach vs miss; the canned point is
+  // what the test asserts against. See grapple.test.ts fakeProbe.
+  const hitProbe = (point: Vec3): AnchorProbe => ({
+    findAnchor: () => ({ found: true, point }),
+  })
+
   // Falling edge: wantsAttach was true last tick (recorded as
   // wasAttachIntentHeld in the state we entered with), is false this tick.
   // stepCharacter must detach the grapple — the player let go of the rope.
@@ -370,6 +377,26 @@ describe('stepCharacter — grapple input edges (hold-to-grapple)', () => {
     )
 
     expect(next.grapple).toEqual({ attached: false })
+  })
+
+  // Rising edge: wantsAttach is true this tick, was false last tick.
+  // stepCharacter must dispatch fireGrapple, which asks the probe for
+  // an anchor. With a hit-returning probe, next state is attached at
+  // the hit point.
+  it('fires the grapple on the rising edge of wantsAttach (probe hit)', () => {
+    const body = fakeBody({ grounded: false })
+    const anchor: Vec3 = [0, 0, -10]
+
+    const next = stepCharacter(
+      state({ wasAttachIntentHeld: false }),
+      intent({ wantsAttach: true, lookDir: [0, 0, -1] }),
+      body,
+      hitProbe(anchor),
+      defaultTuning,
+      1 / 60,
+    )
+
+    expect(next.grapple).toEqual({ attached: true, anchor })
   })
 })
 
