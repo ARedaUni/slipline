@@ -9,6 +9,7 @@ const baseInput = {
   jump: false,
   crouch: false,
   fireGrapple: false,
+  fireHeld: false,
   yaw: 0,
   pitch: 0,
 }
@@ -129,6 +130,16 @@ describe('buildIntent (input → domain MoveIntent)', () => {
     const intent = buildIntent({ ...baseInput, fireGrapple: true })
 
     expect(intent.firedGrapple).toBe(true)
+  })
+
+  // Continuous "fire held" → wantsAttach passthrough. The sim
+  // edge-detects against state.wasAttachIntentHeld; buildIntent just
+  // reports the current live state of the button. Same passthrough
+  // shape as wantsJump / wantsCrouch (live keyboard state).
+  it('forwards fireHeld as wantsAttach=true', () => {
+    const intent = buildIntent({ ...baseInput, fireHeld: true })
+
+    expect(intent.wantsAttach).toBe(true)
   })
 
   // lookDir uses Three.js's YXZ-Euler view-forward convention: at rest the

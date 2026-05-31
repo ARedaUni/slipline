@@ -77,6 +77,7 @@ export const Player = () => {
           yaw: look.yaw,
           pitch: look.pitch,
           fireGrapple: input.mouse.consumeFireClick(),
+          fireHeld: input.mouse.isFireHeld(),
         })
 
         stateRef.current = stepCharacter(

@@ -13,6 +13,10 @@ export type IntentInput = Readonly<{
   // network commands, …) into this single-tick flag. The sim does not
   // track input history.
   fireGrapple: boolean
+  // Live "fire button held" state for hold-to-grapple. Continuous, not
+  // edge — buildIntent forwards as MoveIntent.wantsAttach, and the sim
+  // edge-detects against CharacterState.wasAttachIntentHeld.
+  fireHeld: boolean
   yaw: number
   pitch: number
 }>
@@ -66,6 +70,6 @@ export const buildIntent = (
     wantsJump: input.jump,
     wantsCrouch: input.crouch,
     firedGrapple: input.fireGrapple,
-    wantsAttach: false,
+    wantsAttach: input.fireHeld,
   }
 }
