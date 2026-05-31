@@ -398,6 +398,38 @@ describe('stepCharacter — grapple input edges (hold-to-grapple)', () => {
 
     expect(next.grapple).toEqual({ attached: true, anchor })
   })
+
+  // Steady-hold: wantsAttach was true last tick, still true this tick.
+  // No edge → no dispatch. Probe must NOT be called: the player is
+  // still holding the rope they already attached on the rising edge,
+  // and re-asking the world every tick would re-anchor each frame
+  // (the bug the old fireGrapple-on-every-click semantics avoided by
+  // being an edge pulse — under continuous wantsAttach we have to
+  // assert it ourselves).
+  it('does not re-fire while wantsAttach is held steady', () => {
+    const body = fakeBody({ grounded: false })
+    let probeCalls = 0
+    const countingProbe: AnchorProbe = {
+      findAnchor: () => {
+        probeCalls += 1
+        return { found: true, point: [99, 99, 99] }
+      },
+    }
+
+    stepCharacter(
+      state({
+        grapple: { attached: true, anchor: [0, 0, -10] },
+        wasAttachIntentHeld: true,
+      }),
+      intent({ wantsAttach: true }),
+      body,
+      countingProbe,
+      defaultTuning,
+      1 / 60,
+    )
+
+    expect(probeCalls).toBe(0)
+  })
 })
 
 describe('stepCharacter — grapple composition', () => {
