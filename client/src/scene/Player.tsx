@@ -4,6 +4,7 @@ import { advanceFixedLoop } from '../engine/fixedLoop'
 import { useInput } from '../engine/input/InputContext'
 import { usePhysics } from '../engine/PhysicsContext'
 import { createRapierCharacterBody } from '../engine/rapierAdapter'
+import { createRapierAnchorProbe } from '../engine/rapierAnchorProbe'
 import { buildIntent } from '../sim/intent'
 import {
   type CharacterState,
@@ -24,7 +25,7 @@ const TUNING: StepTuning = {
   groundAccel: 10,
   airWishSpeed: 1,
   airAccel: 100,
-  grapple: { restLength: 5, stiffness: 40, damping: 4 },
+  grapple: { restLength: 5, stiffness: 40, damping: 4, maxRange: 20 },
 }
 
 const LOOP_OPTS = {
@@ -50,12 +51,14 @@ export const Player = () => {
         grounded: false,
         groundNormal: [0, 1, 0],
         grapple: { attached: false },
+        wasAttachIntentHeld: false,
       }
     })(),
   )
   const accumulatorRef = useRef(0)
 
   const body = useMemo(() => createRapierCharacterBody(physics), [physics])
+  const probe = useMemo(() => createRapierAnchorProbe(physics), [physics])
 
   // One-shot setup. First-person look needs Y (yaw) before X (pitch), else
   // pitching while yawed introduces unwanted roll. Three's default is XYZ.
@@ -68,15 +71,19 @@ export const Player = () => {
       accumulatorRef.current,
       delta,
       () => {
+        const look = input.mouse.getLook()
         const intent = buildIntent({
           ...input.keyboard.getKeys(),
-          yaw: input.mouse.getLook().yaw,
+          yaw: look.yaw,
+          pitch: look.pitch,
+          fireHeld: input.mouse.isFireHeld(),
         })
 
         stateRef.current = stepCharacter(
           stateRef.current,
           intent,
           body,
+          probe,
           TUNING,
           FIXED_DT,
         )

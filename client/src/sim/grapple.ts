@@ -21,6 +21,10 @@ export type GrappleTuning = Readonly<{
   stiffness: number
   // Viscous damping coefficient c in F = -c·v_radial. Higher = less yo-yo.
   damping: number
+  // Maximum reach of the grapple — passed to AnchorProbe.findAnchor.
+  // Beyond this distance the probe reports a miss and fireGrapple
+  // returns detached.
+  maxRange: number
 }>
 
 const ZERO: Vec3 = [0, 0, 0]
@@ -62,6 +66,15 @@ export const grappleAcceleration = (
 
   return [radialAccel * ux, radialAccel * uy, radialAccel * uz]
 }
+
+// Falling-edge half of the hold-to-grapple input model. Detaching is a
+// pure state transition: no probe, no world query — the rope just lets
+// go. The signature carries that proof (no AnchorProbe parameter), so a
+// future change cannot quietly start consulting the world without a
+// type error at every call site.
+export const releaseGrapple = (_state: GrappleState): GrappleState => ({
+  attached: false,
+})
 
 // State transition: given a fire request, ask the AnchorProbe whether
 // the world offers something to attach to in that direction within

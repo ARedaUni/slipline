@@ -8,7 +8,9 @@ const baseInput = {
   right: false,
   jump: false,
   crouch: false,
+  fireHeld: false,
   yaw: 0,
+  pitch: 0,
 }
 
 describe('buildIntent (input → domain MoveIntent)', () => {
@@ -116,5 +118,67 @@ describe('buildIntent (input → domain MoveIntent)', () => {
     const intent = buildIntent(baseInput)
 
     expect(intent.wantsCrouch).toBe(false)
+  })
+
+  // Continuous "fire held" → wantsAttach passthrough. The sim
+  // edge-detects against state.wasAttachIntentHeld; buildIntent just
+  // reports the current live state of the button. Same passthrough
+  // shape as wantsJump / wantsCrouch (live keyboard state).
+  it('forwards fireHeld as wantsAttach=true', () => {
+    const intent = buildIntent({ ...baseInput, fireHeld: true })
+
+    expect(intent.wantsAttach).toBe(true)
+  })
+
+  // lookDir uses Three.js's YXZ-Euler view-forward convention: at rest the
+  // camera looks down -Z. The sim consumes lookDir as a unit ray direction
+  // for AnchorProbe.findAnchor, so getting the sign convention right is
+  // load-bearing — a flipped axis would aim the grapple backward.
+  it('produces lookDir = [0, 0, -1] at rest (yaw=0, pitch=0)', () => {
+    const intent = buildIntent(baseInput)
+
+    expect(intent.lookDir[0]).toBeCloseTo(0, 6)
+    expect(intent.lookDir[1]).toBeCloseTo(0, 6)
+    expect(intent.lookDir[2]).toBeCloseTo(-1, 6)
+  })
+
+  // Positive pitch tilts the camera up. At pitch=π/2 the player looks
+  // straight up — lookDir = +Y. Mouse.applyMouseDelta clamps pitch
+  // below π/2 in practice, but the math should still produce the
+  // limit value correctly.
+  it('maps pitch=π/2 to lookDir = [0, 1, 0] (straight up)', () => {
+    const intent = buildIntent({ ...baseInput, pitch: Math.PI / 2 })
+
+    expect(intent.lookDir[0]).toBeCloseTo(0, 6)
+    expect(intent.lookDir[1]).toBeCloseTo(1, 6)
+    expect(intent.lookDir[2]).toBeCloseTo(0, 6)
+  })
+
+  // yaw=π/2 turns the camera 90° left. Forward should rotate from -Z
+  // to -X. Same sign convention the wishDir math uses (see the
+  // "W at yaw=π/2 points toward world -X" test).
+  it('maps yaw=π/2 to lookDir = [-1, 0, 0] (looking left)', () => {
+    const intent = buildIntent({ ...baseInput, yaw: Math.PI / 2 })
+
+    expect(intent.lookDir[0]).toBeCloseTo(-1, 6)
+    expect(intent.lookDir[1]).toBeCloseTo(0, 6)
+    expect(intent.lookDir[2]).toBeCloseTo(0, 6)
+  })
+
+  // Diagonal aim (pitch=π/4 = 45° up): unit-length invariant must hold,
+  // and the components factor cleanly as -sinY·cosP, sinP, -cosY·cosP.
+  // The AnchorProbe contract depends on |lookDir| = 1 so that the
+  // adapter's maxToi maps directly to world-space distance.
+  it('keeps lookDir unit-length on a diagonal aim (pitch=π/4)', () => {
+    const intent = buildIntent({ ...baseInput, pitch: Math.PI / 4 })
+
+    const len = Math.hypot(
+      intent.lookDir[0],
+      intent.lookDir[1],
+      intent.lookDir[2],
+    )
+    expect(len).toBeCloseTo(1, 6)
+    expect(intent.lookDir[1]).toBeCloseTo(Math.SQRT1_2, 6)
+    expect(intent.lookDir[2]).toBeCloseTo(-Math.SQRT1_2, 6)
   })
 })

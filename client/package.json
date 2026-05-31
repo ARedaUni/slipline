@@ -25,7 +25,10 @@
     "onlyBuiltDependencies": [
       "@biomejs/biome",
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "qs@<6.15.2": ">=6.15.2"
+    }
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { AnchorProbe } from '../../../src/sim/anchorProbe'
 import type {
   CharacterBody,
   CollisionResponse,
@@ -19,14 +20,31 @@ const defaultTuning: StepTuning = {
   groundAccel: 10,
   airWishSpeed: 1,
   airAccel: 100,
-  grapple: { restLength: 5, stiffness: 40, damping: 4 },
+  grapple: { restLength: 5, stiffness: 40, damping: 4, maxRange: 50 },
 }
 
-const noIntent: MoveIntent = {
+// Factory: build a MoveIntent with sensible defaults (at rest, no
+// inputs, looking forward). Mirrors the state() factory below.
+// Extracted from inline literals once the Data Clumps smell became
+// concrete during the type-widening commit — the same shape was being
+// constructed at six sites, each with a small variation. Beck's Tidy
+// First trigger: the next change was awkward without it.
+const intent = (overrides: Partial<MoveIntent> = {}): MoveIntent => ({
   wishDir: [0, 0, 0],
+  lookDir: [0, 0, -1],
   wantsJump: false,
   wantsCrouch: false,
-}
+  wantsAttach: false,
+  ...overrides,
+})
+
+// Null probe: stepCharacter requires a probe for the AnchorProbe port,
+// but most tests in this file never fire the grapple (wantsAttach is
+// false throughout). The probe is wired in but never invoked. Tests
+// that care about grapple dispatch pass their own fakeProbe — see
+// the grapple input-edges block below, and grapple.test.ts for the
+// canonical pattern.
+const nullProbe: AnchorProbe = { findAnchor: () => ({ found: false }) }
 
 const UP: Vec3 = [0, 1, 0]
 
@@ -39,6 +57,7 @@ const state = (overrides: Partial<CharacterState> = {}): CharacterState => ({
   grounded: false,
   groundNormal: UP,
   grapple: { attached: false },
+  wasAttachIntentHeld: false,
   ...overrides,
 })
 
@@ -79,7 +98,14 @@ describe('stepCharacter (per-tick character integration)', () => {
   it('applies gravity to vertical velocity each tick', () => {
     const body = fakeBody({ grounded: false })
 
-    const next = stepCharacter(state(), noIntent, body, defaultTuning, 1 / 60)
+    const next = stepCharacter(
+      state(),
+      intent(),
+      body,
+      nullProbe,
+      defaultTuning,
+      1 / 60,
+    )
 
     // vy += gravity * dt = -25 * (1/60) ≈ -0.4167
     expect(next.velocity[1]).toBeCloseTo(-25 / 60, 6)
@@ -90,8 +116,9 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state({ grounded: true }),
-      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
+      intent({ wantsJump: true }),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -108,8 +135,9 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state(),
-      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
+      intent({ wantsJump: true }),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -123,8 +151,9 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state({ velocity: [8, 0, 0], grounded: true }),
-      noIntent,
+      intent(),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -139,8 +168,9 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state({ velocity: [8, 0, 0] }),
-      noIntent,
+      intent(),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -155,8 +185,9 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     stepCharacter(
       state({ velocity: [4, 0, -3] }),
-      noIntent,
+      intent(),
       body,
+      nullProbe,
       defaultTuning,
       dt,
     )
@@ -174,8 +205,9 @@ describe('stepCharacter (per-tick character integration)', () => {
 
     const next = stepCharacter(
       state({ velocity: [0, -10, 0] }),
-      noIntent,
+      intent(),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -193,8 +225,9 @@ describe('stepCharacter (per-tick character integration)', () => {
     // Upward motion must survive.
     const next = stepCharacter(
       state({ velocity: [0, 5, 0], grounded: true }),
-      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
+      intent({ wantsJump: true }),
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -208,7 +241,7 @@ describe('stepCharacter (per-tick character integration)', () => {
   it('calls body.tryMove exactly once per step', () => {
     const body = fakeBody({ grounded: false })
 
-    stepCharacter(state(), noIntent, body, defaultTuning, 1 / 60)
+    stepCharacter(state(), intent(), body, nullProbe, defaultTuning, 1 / 60)
 
     expect(body.callCount()).toBe(1)
   })
@@ -217,7 +250,14 @@ describe('stepCharacter (per-tick character integration)', () => {
     const slope: Vec3 = [-0.5, 0.866, 0]
     const body = fakeBody({ grounded: true, groundNormal: slope })
 
-    const next = stepCharacter(state(), noIntent, body, defaultTuning, 1 / 60)
+    const next = stepCharacter(
+      state(),
+      intent(),
+      body,
+      nullProbe,
+      defaultTuning,
+      1 / 60,
+    )
 
     expect(next.groundNormal[0]).toBeCloseTo(slope[0], 6)
     expect(next.groundNormal[1]).toBeCloseTo(slope[1], 6)
@@ -226,11 +266,7 @@ describe('stepCharacter (per-tick character integration)', () => {
 })
 
 describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
-  const crouchIntent: MoveIntent = {
-    wishDir: [0, 0, 0],
-    wantsJump: false,
-    wantsCrouch: true,
-  }
+  const crouchIntent: MoveIntent = intent({ wantsCrouch: true })
 
   it('skips ground friction on flat ground: horizontal momentum preserved', () => {
     const body = fakeBody({ grounded: true, groundNormal: UP })
@@ -239,6 +275,7 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
       state({ velocity: [8, 0, 0], grounded: true }),
       crouchIntent,
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -259,6 +296,7 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
       state({ grounded: true, groundNormal: normal }),
       crouchIntent,
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -283,6 +321,7 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
       state({ velocity: sliding, grounded: true, groundNormal: normal }),
       crouchIntent,
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -298,6 +337,7 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
       state({ velocity: [8, 0, 0] }),
       crouchIntent,
       body,
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -305,6 +345,90 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
     // air branch ignores crouch; same as no-crouch air behaviour
     expect(next.velocity[0]).toBeCloseTo(8, 6)
     expect(next.velocity[1]).toBeCloseTo(-25 / 60, 6)
+  })
+})
+
+describe('stepCharacter — grapple input edges (hold-to-grapple)', () => {
+  // Hit-returning probe for rising-edge dispatch. fireGrapple needs
+  // a probe answer to decide attach vs miss; the canned point is
+  // what the test asserts against. See grapple.test.ts fakeProbe.
+  const hitProbe = (point: Vec3): AnchorProbe => ({
+    findAnchor: () => ({ found: true, point }),
+  })
+
+  // Falling edge: wantsAttach was true last tick (recorded as
+  // wasAttachIntentHeld in the state we entered with), is false this tick.
+  // stepCharacter must detach the grapple — the player let go of the rope.
+  // releaseGrapple does this without consulting the probe; the probe-free
+  // signature is what makes this branch testable without a fakeProbe.
+  it('releases an attached grapple on the falling edge of wantsAttach', () => {
+    const body = fakeBody({ grounded: false })
+
+    const next = stepCharacter(
+      state({
+        grapple: { attached: true, anchor: [0, 0, -10] },
+        wasAttachIntentHeld: true,
+      }),
+      intent({ wantsAttach: false }),
+      body,
+      nullProbe,
+      defaultTuning,
+      1 / 60,
+    )
+
+    expect(next.grapple).toEqual({ attached: false })
+  })
+
+  // Rising edge: wantsAttach is true this tick, was false last tick.
+  // stepCharacter must dispatch fireGrapple, which asks the probe for
+  // an anchor. With a hit-returning probe, next state is attached at
+  // the hit point.
+  it('fires the grapple on the rising edge of wantsAttach (probe hit)', () => {
+    const body = fakeBody({ grounded: false })
+    const anchor: Vec3 = [0, 0, -10]
+
+    const next = stepCharacter(
+      state({ wasAttachIntentHeld: false }),
+      intent({ wantsAttach: true, lookDir: [0, 0, -1] }),
+      body,
+      hitProbe(anchor),
+      defaultTuning,
+      1 / 60,
+    )
+
+    expect(next.grapple).toEqual({ attached: true, anchor })
+  })
+
+  // Steady-hold: wantsAttach was true last tick, still true this tick.
+  // No edge → no dispatch. Probe must NOT be called: the player is
+  // still holding the rope they already attached on the rising edge,
+  // and re-asking the world every tick would re-anchor each frame
+  // (the bug the old fireGrapple-on-every-click semantics avoided by
+  // being an edge pulse — under continuous wantsAttach we have to
+  // assert it ourselves).
+  it('does not re-fire while wantsAttach is held steady', () => {
+    const body = fakeBody({ grounded: false })
+    let probeCalls = 0
+    const countingProbe: AnchorProbe = {
+      findAnchor: () => {
+        probeCalls += 1
+        return { found: true, point: [99, 99, 99] }
+      },
+    }
+
+    stepCharacter(
+      state({
+        grapple: { attached: true, anchor: [0, 0, -10] },
+        wasAttachIntentHeld: true,
+      }),
+      intent({ wantsAttach: true }),
+      body,
+      countingProbe,
+      defaultTuning,
+      1 / 60,
+    )
+
+    expect(probeCalls).toBe(0)
   })
 })
 
@@ -324,8 +448,9 @@ describe('stepCharacter — grapple composition', () => {
         velocity: [0, 0, 0],
         grapple: { attached: true, anchor: [10, 0, 0] },
       }),
-      noIntent,
+      intent(),
       body,
+      nullProbe,
       defaultTuning,
       dt,
     )
@@ -345,9 +470,10 @@ describe('stepCharacter — deterministic scenarios', () => {
     // tick 0: jump
     s = stepCharacter(
       s,
-      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
+      intent({ wantsJump: true }),
       // for the jump tick, fake-body grounded=true (we're on the floor)
       fakeBody({ grounded: true, groundNormal: UP }),
+      nullProbe,
       defaultTuning,
       1 / 60,
     )
@@ -357,7 +483,7 @@ describe('stepCharacter — deterministic scenarios', () => {
 
     // simulate falling: 17 more frames, body says NOT grounded
     for (let i = 0; i < 17; i++) {
-      s = stepCharacter(s, noIntent, airBody, defaultTuning, 1 / 60)
+      s = stepCharacter(s, intent(), airBody, nullProbe, defaultTuning, 1 / 60)
     }
 
     // after 17 ticks of gravity, vy = 7.5 + (-25)*(17/60) ≈ 7.5 - 7.083 ≈ 0.417

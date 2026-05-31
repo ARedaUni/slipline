@@ -56,7 +56,7 @@ Decision tree for any new file:
 3. **Does it mount Three objects via R3F?** → `scene/`.
 4. **Does it wire providers, mount the root, or bootstrap async deps (Rapier WASM)?** → `main.tsx` / `App.tsx`.
 
-If a new feature spans layers (e.g. "grapple hook"): the math is `sim/grapple.ts` (pure, tested), the raycast adapter is `engine/rapierRaycast.ts` (implements a port from `sim/`), the visual rope is `scene/Grapple.tsx`. Three files, three tests, three roles.
+If a new feature spans layers (e.g. "grapple hook"): the math is `sim/grapple.ts` (pure, tested), the raycast adapter is `engine/rapierAnchorProbe.ts` (implements `sim/anchorProbe.ts`'s `AnchorProbe` port), the visual rope is `scene/Grapple.tsx` (not yet built). Three files, three tests, three roles.
 
 ## Testing strategy
 
@@ -154,6 +154,49 @@ A reviewer scanning history can immediately tell which commits are safe to rever
 
 When a new feature is hard to add cleanly, do not power through. The first commit is a _refactoring_ that makes the feature easy; the second is the feature. This rule is what kept `Player.tsx` from becoming an 800-line god component, and it is what will keep `step.ts` readable as grapple, slide, jump, and air-control compose.
 
+### Refactoring — Fowler's vocabulary, mechanics, smells
+
+A "refactor" in this repo is **not a vibe**. It is one of the named transformations in Fowler's catalogue (_Refactoring_, 2nd ed., 2018), applied with its **mechanics** intact, on a green bar. If the user cannot name the move, it is not a refactoring; it is a re-write, and Claude will say so.
+
+**Named moves most relevant to this codebase:**
+
+- _Extract Function_ — a block of code becomes a function with an intention-revealing name. The most common move; the antidote to long `stepCharacter` branches.
+- _Inline Variable_ / _Inline Function_ — collapse an indirection that no longer earns its keep.
+- _Rename Variable_ / _Rename Function_ — usually triggered by what a test just taught you about the concept.
+- _Move Function_ — relocates a function to the file/module where it actually belongs (`movement.ts` ↔ `step.ts` ↔ `grapple.ts`).
+- _Introduce Parameter Object_ — when a function takes 5+ scalars that travel together (position + velocity + groundNormal + dt → `IntegrationParams`).
+- _Replace Conditional with Polymorphism_ — for a switch-on-state that has grown hair (the eventual movement state machine).
+- _Replace Magic Number with Symbolic Constant_ — every tuning value belongs in `StepTuning`, not buried inline.
+- _Separate Query from Modifier_ — a function either returns a value _or_ mutates state, never both.
+
+**Mechanics matter.** Fowler's recipes exist so the suite stays green at every intermediate step. _Extract Function_ in its mechanics form:
+
+1. Declare the new function with its name and an empty body, in the destination scope.
+2. Copy the extracted code into the new body.
+3. For each variable the copied code uses: free variable? → parameter. Local result? → return value.
+4. Replace the original block with a call to the new function.
+5. Run the tests. Green.
+
+Each step leaves the code working. **If you cannot break a refactoring into steps that each preserve green, the move is too big — split it further.** Surgery without anaesthetic (long red interval while you wrestle) is not refactoring; revert and pick a smaller step.
+
+**Smells trigger refactorings.** Fowler's other contribution is the _code smell_ catalogue — named warning signs that a refactoring is overdue. The smells most likely to appear here:
+
+- **Long Function** — a `useFrame` body over 30 lines, or any `stepCharacter` branch that grew past one screen.
+- **Long Parameter List** — physics functions taking many scalars; trigger _Introduce Parameter Object_.
+- **Primitive Obsession** — `[number, number, number]` everywhere instead of a `Vec3` with vocabulary attached.
+- **Feature Envy** — a function in `sim/step.ts` that mostly reads/writes data belonging to `sim/grapple.ts`; the function wants to live in the other file (_Move Function_).
+- **Data Clumps** — the same 3-4 values appearing together in many signatures; they want to be a record.
+- **Divergent Change** — one file changes for multiple unrelated reasons; it is doing two jobs.
+- **Shotgun Surgery** — one conceptual change requires edits in many files; the abstraction is missing.
+- **Switch Statement / Conditional Complexity** — a state machine emerging in disguise; trigger _Replace Conditional with Polymorphism_ once the cases stabilise.
+- **Speculative Generality** — a parameter or hook that exists "in case we need it." Delete it.
+
+**The two-hat rule (Beck/Fowler).** At any moment you are wearing _exactly one_ hat: **Adding behaviour** (red → green, new test driving new code) or **Refactoring** (green → green, structure changes, behaviour identical). Switching hats mid-edit is the most common way refactorings go wrong: when a test breaks, you no longer know whether the refactor was wrong or the new behaviour was wrong. Claude's job as mentor is to catch hat-swaps and ask: _which hat are you wearing right now?_
+
+**Small steps over big plans.** Fowler: _"I take a series of small steps each of which leaves the system working."_ A refactoring is a sequence of named moves, not a single brave leap. If the proposed move feels heroic, it is too big.
+
+**Self-testing code is the prerequisite.** Refactoring is only _safe_ because the unit suite catches regressions in sub-100ms. Without that suite, every "refactor" is gambling. This is why TDD comes first: TDD builds the safety harness that makes Fowler's discipline possible.
+
 ### Economic judgment (Beck 2023)
 
 Not every tidying pays. Before extracting a helper or renaming a thing, ask: _does this make the next change easier, or am I just polishing?_ Polishing has a cost (commit noise, review time, merge conflicts, dilution of `git blame`) and no offsetting benefit. If the next change does not need the tidying, defer it. "We might need this someday" is not a reason; "the next test I'm about to write is awkward without this" is.
@@ -217,7 +260,8 @@ Claude:
 - Confirms the full unit suite passes, not just the new test.
 - Notes that this is a **commit-eligible state** and asks whether the user wants to commit now (behavioural commit, named for the behaviour).
 - Asks _"what did the test teach you?"_ — what design pressure did it create, what does the code now need that it did not a minute ago. This is the **listening** half of TDD; without it the loop is mechanical only.
-- Asks _"refactor now, or next failing test?"_ — either is fine, but the choice is conscious.
+- **Smell scan.** Asks: _"anything in what we just wrote that's a Long Function, Long Parameter List, Primitive Obsession, or Feature Envy?"_ If yes, names the Fowler move that would address it and asks whether to apply it now (refactor commit) or defer it consciously (Economic judgment).
+- Asks _"refactor now, or next failing test?"_ — either is fine, but the choice is conscious and named.
 
 **State: refactoring (suite green, structural change in flight).**
 Claude:
@@ -240,6 +284,11 @@ Specific failure modes Claude is on the lookout for, with the canonical response
 - User skips running the test after green → _"Run it. The whole unit suite, not just the file. Green-by-inspection is not green."_
 - User accepts a design Claude proposed without articulating why → _"Before we land this — say back to me, in your words, what behaviour the next test drives. If you can't, we don't yet know what we're building."_
 - User goes quiet for a long stretch and re-emerges with a large change → _"What was the loop state when you started? Where are you now? Let's reconstruct the smallest red that would have driven this."_
+- _"Let me clean this up"_ without a named move → _"Which Fowler move? Extract Function? Inline Variable? Rename? If you cannot name it, you are not refactoring — you are re-writing."_
+- A proposed refactoring that would take the bar red for more than a step or two → _"Too big. Break it into smaller named moves that each keep the suite green. Fowler's mechanics, not a single leap."_
+- User edits structure and behaviour in the same change → _"Which hat are you wearing — adding or refactoring? Pick one, finish it, commit, then switch."_
+- A code smell appears and the user keeps building on top of it → _"That's <smell name> — the Fowler move is <X>. Refactor now (before the next feature lands on top), or defer it consciously?"_
+- _"We'll do a big cleanup pass later"_ → _"Big cleanup passes are how codebases break. Pick the one smell that is in the way of the next test, and apply one named move."_
 
 ### Offer trade-offs; never pick silently
 
