@@ -87,3 +87,31 @@ describe('createMouse — consumeFireClick edge semantics', () => {
     expect(mouse.consumeFireClick()).toBe(false)
   })
 })
+
+// Continuous "fire button held" state — the hold-to-grapple input model.
+// Distinct from consumeFireClick: isFireHeld is a live read (no consume
+// side-effect), true while the primary button is down (after pointer-lock
+// is acquired) and back to false on mouseup. The sim edge-detects against
+// this; the engine just reports current state.
+describe('createMouse — isFireHeld continuous state', () => {
+  let override: LockOverride | null = null
+
+  beforeEach(() => {
+    override = null
+  })
+
+  afterEach(() => {
+    override?.restore()
+  })
+
+  test('returns true between mousedown and mouseup while pointer-lock is held', () => {
+    override = overridePointerLockElement(document.body)
+    const mouse = createMouse({ element: document.body })
+
+    document.dispatchEvent(new MouseEvent('mousedown', { button: 0 }))
+    expect(mouse.isFireHeld()).toBe(true)
+
+    document.dispatchEvent(new MouseEvent('mouseup', { button: 0 }))
+    expect(mouse.isFireHeld()).toBe(false)
+  })
+})

@@ -28,6 +28,11 @@ export type Mouse = {
   // first click of a session is what grabs the lock, and we do not want
   // that one to fire a grapple.
   readonly consumeFireClick: () => boolean
+  // Continuous "primary button held while pointer-lock active" flag.
+  // True between primary mousedown and mouseup (or pointer-lock loss);
+  // false otherwise. Live read with no consume side-effect, so the sim
+  // can poll it every tick to drive hold-to-grapple edge detection.
+  readonly isFireHeld: () => boolean
   readonly dispose: () => void
 }
 
@@ -44,6 +49,7 @@ export const createMouse = (opts: MouseOptions = {}): Mouse => {
 
   let state: LookState = { yaw: 0, pitch: 0 }
   let pendingFire = false
+  let fireHeld = false
 
   const onMove = (e: MouseEvent) => {
     if (document.pointerLockElement !== element) return
@@ -58,10 +64,17 @@ export const createMouse = (opts: MouseOptions = {}): Mouse => {
     // grabs the lock and must not also be interpreted as a fire.
     if (document.pointerLockElement !== element) return
     pendingFire = true
+    fireHeld = true
+  }
+
+  const onMouseUp = (e: MouseEvent) => {
+    if (e.button !== 0) return
+    fireHeld = false
   }
 
   document.addEventListener('mousemove', onMove)
   document.addEventListener('mousedown', onMouseDown)
+  document.addEventListener('mouseup', onMouseUp)
 
   return {
     getLook: () => state,
@@ -74,9 +87,11 @@ export const createMouse = (opts: MouseOptions = {}): Mouse => {
       pendingFire = false
       return r
     },
+    isFireHeld: () => fireHeld,
     dispose: () => {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('mouseup', onMouseUp)
     },
   }
 }
