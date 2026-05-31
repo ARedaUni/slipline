@@ -56,7 +56,7 @@ Decision tree for any new file:
 3. **Does it mount Three objects via R3F?** → `scene/`.
 4. **Does it wire providers, mount the root, or bootstrap async deps (Rapier WASM)?** → `main.tsx` / `App.tsx`.
 
-If a new feature spans layers (e.g. "grapple hook"): the math is `sim/grapple.ts` (pure, tested), the raycast adapter is `engine/rapierRaycast.ts` (implements a port from `sim/`), the visual rope is `scene/Grapple.tsx`. Three files, three tests, three roles.
+If a new feature spans layers (e.g. "grapple hook"): the math is `sim/grapple.ts` (pure, tested), the raycast adapter is `engine/rapierAnchorProbe.ts` (implements `sim/anchorProbe.ts`'s `AnchorProbe` port), the visual rope is `scene/Grapple.tsx` (not yet built). Three files, three tests, three roles.
 
 ## Testing strategy
 

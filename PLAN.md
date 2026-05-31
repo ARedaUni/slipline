@@ -168,12 +168,13 @@ Goal: nail the movement before anything multiplayer matters. If the game doesn't
 
 Verify: capsule moves smoothly, collides correctly with the floor, cannot fall through. Strafe-jump preserves horizontal momentum across consecutive jumps. Movement equations unit-tested independent of Rapier.
 
-**Slice 1.3 — Arena + slide + grapple**
+**Slice 1.3 — Arena + slide + grapple** (sim layer landed; visual rope + tuning HUD still pending)
 
-- Replace the placeholder floor with a small hand-built arena (boxes, ramps, a wall worth grappling onto). One mesh; no procedural generation.
-- **Crouch-slide**: friction reduction + downslope-projected impulse (constant force along the slope tangent)
-- **Grapple hook**: raycast → attach point → spring force. First pass: hand-rolled Hookean spring on the capsule's velocity (`F = -k·Δx - c·v`); reuse Rapier joint only if the hand-rolled spring feels wrong.
-- Movement-tuning HUD (React DOM overlay _outside_ the Canvas — keeps physics clean): sliders for friction, slide impulse magnitude, grapple stiffness/damping.
+- ✅ Arena: hand-built floor + 25° ramp + wall (`engine/arena.ts`, `scene/Arena.tsx`).
+- ✅ Crouch-slide: gravity projected onto slope tangent, friction skipped while crouched (`sim/step.ts` slide branch).
+- ✅ Grapple hook: hand-rolled damped Hookean spring (`F = -k·Δx - c·v_radial`) in `sim/grapple.ts`, raycast adapter in `engine/rapierAnchorProbe.ts`, hold-to-grapple input model (hold primary mouse = attach, release = detach) with rising/falling edge detection in `sim/step.ts` against `wasAttachIntentHeld`.
+- ⏳ Visual rope (`scene/Grapple.tsx`): line from player to anchor while attached.
+- ⏳ Movement-tuning HUD (React DOM overlay _outside_ the Canvas — keeps physics clean): sliders for friction, slide impulse magnitude, grapple stiffness/damping.
 
 Verify: you can run a loop around the arena in under 30s using slide+grapple chains and it feels juicy. Tuning sliders dialed in. Recordings of "feels good" sessions saved for regression-by-eye in Phase 2.
 
@@ -232,20 +233,42 @@ Reuse these _concepts_; do not pull a netcode library. The whole point is to int
 
 ## Critical Files
 
-**Client (exists today, Slice 1.1)**
+Four-layer architecture: `sim/` (pure domain) ← `engine/` (runtime adapters) ← `scene/` (R3F) ← composition root. Dependency arrow strictly one-way; see CLAUDE.md for the full rules.
 
-- `client/src/physics/integrator.ts` — pure kinematic step (semi-implicit Euler). Framework-free. Mirrors what `server/internal/game/physics.go` will run.
-- `client/src/physics/types.ts` — `Vec3`, `KinematicState`, `IntegrationParams`. Readonly tuples and objects only.
-- `client/src/physics/world.ts` — Rapier world factory (`createPhysicsWorld()`). Called once from `main.tsx`. Will grow to own the player body, arena colliders, joints.
-- `client/src/physics/PhysicsContext.tsx` — DI provider + `usePhysics()` hook. The seam tests inject through.
-- `client/src/scene/Scene.tsx` — R3F `<Canvas>`. Owns camera, lighting, per-entity components. Imperative ref-sync inside `useFrame`.
+**Client — sim (pure domain, no React/Three/Rapier)**
+
+- `client/src/sim/integrator.ts` — pure kinematic step (semi-implicit Euler). Framework-free. Mirrors what `server/internal/game/physics.go` will run.
+- `client/src/sim/types.ts` — `Vec3`, `KinematicState`, `IntegrationParams`. Readonly tuples and objects only.
+- `client/src/sim/movement.ts` — Quake/Source velocity equations (friction, ground/air accelerate). Pure. Will be ported to Go.
+- `client/src/sim/step.ts` — `stepCharacter` per-tick integration: gravity, jump, slide branch, grapple edge-dispatch, force composition, `body.tryMove`. `CharacterState` + `StepTuning` live here.
+- `client/src/sim/intent.ts` — `IntentInput → MoveIntent` via `buildIntent`. Forwards `wishDir`, `lookDir`, `wantsJump`, `wantsCrouch`, `wantsAttach` (hold-to-grapple continuous flag).
+- `client/src/sim/grapple.ts` — damped Hookean spring + `fireGrapple` (probe-driven attach) + `releaseGrapple` (probe-free detach). Hold-to-grapple input model: rising edge → fire, falling edge → release.
+- `client/src/sim/character.ts` — `CharacterBody` port (interface).
+- `client/src/sim/anchorProbe.ts` — `AnchorProbe` port (interface for raycast).
+
+**Client — engine (runtime adapters)**
+
+- `client/src/engine/physicsWorld.ts` — Rapier world factory (`createPhysicsWorld()`). Owns player body, KCC, arena colliders. Called once from `main.tsx`.
+- `client/src/engine/PhysicsContext.tsx` — DI provider + `usePhysics()` hook. The seam tests inject through.
+- `client/src/engine/rapierAdapter.ts` — implements `sim/character.ts`'s `CharacterBody` against `KinematicCharacterController`.
+- `client/src/engine/rapierAnchorProbe.ts` — implements `sim/anchorProbe.ts`'s `AnchorProbe` against `world.castRay`.
+- `client/src/engine/arena.ts` — static floor + ramp + wall colliders.
+- `client/src/engine/fixedLoop.ts` — Fiedler accumulator (pure).
+- `client/src/engine/input/keyboard.ts` — key-state singleton.
+- `client/src/engine/input/mouse.ts` — pointer-lock + look + `isFireHeld()` (continuous primary-button state for hold-to-grapple).
+- `client/src/engine/input/InputContext.tsx` — DI provider + `useInput()` hook.
+
+**Client — scene + composition**
+
+- `client/src/scene/Scene.tsx` — R3F `<Canvas>`. Lights, static meshes.
+- `client/src/scene/Player.tsx` — `useFrame` driver, camera sync, pointer-lock acquisition, intent assembly.
+- `client/src/scene/Arena.tsx` — visual floor/ramp/wall meshes mirroring `engine/arena.ts`.
 - `client/src/main.tsx` — async bootstrap: awaits `createPhysicsWorld()` before the first React render.
 
-**Client (next slices)**
+**Client — not yet built**
 
-- `client/src/physics/movement.ts` (Slice 1.2) — Quake/Source velocity equations. Pure. Will be ported to Go.
-- `client/src/input/keyboard.ts` (Slice 1.2) — key-state singleton, exposed via a hook.
-- `client/src/physics/grapple.ts` (Slice 1.3) — raycast + spring constraint.
+- `client/src/scene/Grapple.tsx` (Slice 1.3 tail) — visual rope from player to attached anchor.
+- Tuning HUD overlay (Slice 1.3 tail) — DOM-side sliders for friction, slide, grapple stiffness/damping.
 
 **Server (Phase 2+)**
 
