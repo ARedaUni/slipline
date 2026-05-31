@@ -28,6 +28,12 @@ export type MoveIntent = Readonly<{
   wantsJump: boolean
   wantsCrouch: boolean
   firedGrapple: boolean
+  // Continuous "fire button held" flag for the hold-to-grapple model.
+  // stepCharacter edge-detects against state.wasAttachIntentHeld:
+  // rising edge (false→true) dispatches fireGrapple, falling edge
+  // (true→false) dispatches releaseGrapple, steady-state is a no-op.
+  // Coexists with firedGrapple during the wiring transition.
+  wantsAttach: boolean
 }>
 
 const EPSILON = 1e-6
@@ -60,5 +66,6 @@ export const buildIntent = (
     wantsJump: input.jump,
     wantsCrouch: input.crouch,
     firedGrapple: input.fireGrapple,
+    wantsAttach: false,
   }
 }

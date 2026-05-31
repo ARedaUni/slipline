@@ -35,6 +35,7 @@ const intent = (overrides: Partial<MoveIntent> = {}): MoveIntent => ({
   wantsJump: false,
   wantsCrouch: false,
   firedGrapple: false,
+  wantsAttach: false,
   ...overrides,
 })
 
@@ -56,6 +57,7 @@ const state = (overrides: Partial<CharacterState> = {}): CharacterState => ({
   grounded: false,
   groundNormal: UP,
   grapple: { attached: false },
+  wasAttachIntentHeld: false,
   ...overrides,
 })
 
@@ -343,6 +345,31 @@ describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
     // air branch ignores crouch; same as no-crouch air behaviour
     expect(next.velocity[0]).toBeCloseTo(8, 6)
     expect(next.velocity[1]).toBeCloseTo(-25 / 60, 6)
+  })
+})
+
+describe('stepCharacter — grapple input edges (hold-to-grapple)', () => {
+  // Falling edge: wantsAttach was true last tick (recorded as
+  // wasAttachIntentHeld in the state we entered with), is false this tick.
+  // stepCharacter must detach the grapple — the player let go of the rope.
+  // releaseGrapple does this without consulting the probe; the probe-free
+  // signature is what makes this branch testable without a fakeProbe.
+  it('releases an attached grapple on the falling edge of wantsAttach', () => {
+    const body = fakeBody({ grounded: false })
+
+    const next = stepCharacter(
+      state({
+        grapple: { attached: true, anchor: [0, 0, -10] },
+        wasAttachIntentHeld: true,
+      }),
+      intent({ wantsAttach: false }),
+      body,
+      nullProbe,
+      defaultTuning,
+      1 / 60,
+    )
+
+    expect(next.grapple).toEqual({ attached: false })
   })
 })
 

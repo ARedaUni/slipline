@@ -5,6 +5,7 @@ import {
   type GrappleState,
   type GrappleTuning,
   grappleAcceleration,
+  releaseGrapple,
 } from './grapple'
 import type { MoveIntent } from './intent'
 import { accelerate, applyFriction } from './movement'
@@ -28,6 +29,12 @@ export type CharacterState = Readonly<{
   // not transition between attached/detached. When attached, the spring
   // acceleration composes with the rest of the step (bullet c).
   grapple: GrappleState
+  // Last tick's wantsAttach value. Lives on CharacterState (not the
+  // engine layer) because tick cadence is the sim's concept — the
+  // engine knows DOM events, not when a tick boundary happened.
+  // stepCharacter compares this to the current intent.wantsAttach to
+  // detect rising/falling edges of the fire-held input.
+  wasAttachIntentHeld: boolean
 }>
 
 export type StepTuning = Readonly<{
@@ -84,6 +91,10 @@ export const stepCharacter = (
       tuning.grapple.maxRange,
       probe,
     )
+  }
+  // Falling edge of hold-to-grapple: was held last tick, released now.
+  if (state.wasAttachIntentHeld && !intent.wantsAttach) {
+    grapple = releaseGrapple(grapple)
   }
 
   // gravity
@@ -146,5 +157,6 @@ export const stepCharacter = (
     grounded,
     groundNormal,
     grapple,
+    wasAttachIntentHeld: intent.wantsAttach,
   }
 }

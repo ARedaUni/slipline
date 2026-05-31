@@ -51,6 +51,7 @@ export const Player = () => {
         grounded: false,
         groundNormal: [0, 1, 0],
         grapple: { attached: false },
+        wasAttachIntentHeld: false,
       }
     })(),
   )
