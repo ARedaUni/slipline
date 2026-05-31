@@ -83,15 +83,6 @@ export const stepCharacter = (
   // every call (see grapple.ts), so re-firing while attached either
   // re-anchors or detaches, exactly as the idempotency rule prescribes.
   let grapple: GrappleState = state.grapple
-  if (intent.firedGrapple) {
-    grapple = fireGrapple(
-      grapple,
-      state.position,
-      intent.lookDir,
-      tuning.grapple.maxRange,
-      probe,
-    )
-  }
   // Rising edge of hold-to-grapple: not held last tick, held now.
   if (!state.wasAttachIntentHeld && intent.wantsAttach) {
     grapple = fireGrapple(

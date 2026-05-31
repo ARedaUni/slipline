@@ -7,12 +7,6 @@ export type IntentInput = Readonly<{
   right: boolean
   jump: boolean
   crouch: boolean
-  // Edge pulse: true on exactly the tick a fire-grapple event happened
-  // (e.g. mousedown on the client). The engine input adapter is
-  // responsible for translating its medium's native edges (DOM events,
-  // network commands, …) into this single-tick flag. The sim does not
-  // track input history.
-  fireGrapple: boolean
   // Live "fire button held" state for hold-to-grapple. Continuous, not
   // edge — buildIntent forwards as MoveIntent.wantsAttach, and the sim
   // edge-detects against CharacterState.wasAttachIntentHeld.
@@ -31,12 +25,10 @@ export type MoveIntent = Readonly<{
   lookDir: Vec3
   wantsJump: boolean
   wantsCrouch: boolean
-  firedGrapple: boolean
   // Continuous "fire button held" flag for the hold-to-grapple model.
   // stepCharacter edge-detects against state.wasAttachIntentHeld:
   // rising edge (false→true) dispatches fireGrapple, falling edge
   // (true→false) dispatches releaseGrapple, steady-state is a no-op.
-  // Coexists with firedGrapple during the wiring transition.
   wantsAttach: boolean
 }>
 
@@ -69,7 +61,6 @@ export const buildIntent = (
     lookDir,
     wantsJump: input.jump,
     wantsCrouch: input.crouch,
-    firedGrapple: input.fireGrapple,
     wantsAttach: input.fireHeld,
   }
 }

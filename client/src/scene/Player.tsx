@@ -76,7 +76,6 @@ export const Player = () => {
           ...input.keyboard.getKeys(),
           yaw: look.yaw,
           pitch: look.pitch,
-          fireGrapple: input.mouse.consumeFireClick(),
           fireHeld: input.mouse.isFireHeld(),
         })
 

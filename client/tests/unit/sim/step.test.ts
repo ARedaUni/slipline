@@ -34,16 +34,16 @@ const intent = (overrides: Partial<MoveIntent> = {}): MoveIntent => ({
   lookDir: [0, 0, -1],
   wantsJump: false,
   wantsCrouch: false,
-  firedGrapple: false,
   wantsAttach: false,
   ...overrides,
 })
 
 // Null probe: stepCharacter requires a probe for the AnchorProbe port,
-// but tests in this file never fire the grapple (firedGrapple is false
-// throughout). The probe is wired in but never invoked. Tests that
-// care about grapple dispatch should pass their own fakeProbe — see
-// grapple.test.ts for the canonical pattern.
+// but most tests in this file never fire the grapple (wantsAttach is
+// false throughout). The probe is wired in but never invoked. Tests
+// that care about grapple dispatch pass their own fakeProbe — see
+// the grapple input-edges block below, and grapple.test.ts for the
+// canonical pattern.
 const nullProbe: AnchorProbe = { findAnchor: () => ({ found: false }) }
 
 const UP: Vec3 = [0, 1, 0]

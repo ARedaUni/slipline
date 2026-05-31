@@ -21,17 +21,12 @@ export type Mouse = {
   readonly getLook: () => Readonly<LookState>
   readonly requestLock: () => void
   readonly isLocked: () => boolean
-  // Edge-event consumer: returns true on exactly the tick after a
-  // primary-button mousedown that happened while pointer-lock was held,
-  // and false otherwise. Reading it CLEARS the pulse, so the sim only
-  // observes the edge once. Mousedowns while unlocked are ignored — the
-  // first click of a session is what grabs the lock, and we do not want
-  // that one to fire a grapple.
-  readonly consumeFireClick: () => boolean
   // Continuous "primary button held while pointer-lock active" flag.
   // True between primary mousedown and mouseup (or pointer-lock loss);
   // false otherwise. Live read with no consume side-effect, so the sim
   // can poll it every tick to drive hold-to-grapple edge detection.
+  // Mousedowns while unlocked are ignored — the first click of a
+  // session grabs the lock and must not also fire the grapple.
   readonly isFireHeld: () => boolean
   readonly dispose: () => void
 }
@@ -48,7 +43,6 @@ export const createMouse = (opts: MouseOptions = {}): Mouse => {
   const element = opts.element ?? document.body
 
   let state: LookState = { yaw: 0, pitch: 0 }
-  let pendingFire = false
   let fireHeld = false
 
   const onMove = (e: MouseEvent) => {
@@ -63,7 +57,6 @@ export const createMouse = (opts: MouseOptions = {}): Mouse => {
     // Ignore mousedowns until pointer-lock is held — the first click
     // grabs the lock and must not also be interpreted as a fire.
     if (document.pointerLockElement !== element) return
-    pendingFire = true
     fireHeld = true
   }
 
@@ -82,11 +75,6 @@ export const createMouse = (opts: MouseOptions = {}): Mouse => {
       element.requestPointerLock()
     },
     isLocked: () => document.pointerLockElement === element,
-    consumeFireClick: () => {
-      const r = pendingFire
-      pendingFire = false
-      return r
-    },
     isFireHeld: () => fireHeld,
     dispose: () => {
       document.removeEventListener('mousemove', onMove)
