@@ -7,6 +7,7 @@ const baseInput = {
   left: false,
   right: false,
   jump: false,
+  crouch: false,
   yaw: 0,
 }
 
@@ -103,5 +104,17 @@ describe('buildIntent (input → domain MoveIntent)', () => {
     const intent = buildIntent({ ...baseInput, jump: true })
 
     expect(intent.wantsJump).toBe(true)
+  })
+
+  it('forwards crouch as wantsCrouch=true', () => {
+    const intent = buildIntent({ ...baseInput, crouch: true })
+
+    expect(intent.wantsCrouch).toBe(true)
+  })
+
+  it('defaults wantsCrouch to false when crouch is not held', () => {
+    const intent = buildIntent(baseInput)
+
+    expect(intent.wantsCrouch).toBe(false)
   })
 })

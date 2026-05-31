@@ -1,4 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat'
+import { createArena } from './arena'
 
 export type PhysicsWorld = {
   readonly world: RAPIER.World
@@ -16,9 +17,7 @@ export const createPhysicsWorld = async (): Promise<PhysicsWorld> => {
   await RAPIER.init()
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
 
-  const groundDesc = RAPIER.ColliderDesc.cuboid(10, 0.1, 10)
-  groundDesc.setTranslation(0, -0.1, 0)
-  world.createCollider(groundDesc)
+  createArena(world)
 
   const playerDesc =
     RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(

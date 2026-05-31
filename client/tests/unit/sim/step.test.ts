@@ -4,7 +4,7 @@ import type {
   CollisionResponse,
 } from '../../../src/sim/character'
 import type { MoveIntent } from '../../../src/sim/intent'
-import type { StepTuning } from '../../../src/sim/step'
+import type { CharacterState, StepTuning } from '../../../src/sim/step'
 import { stepCharacter } from '../../../src/sim/step'
 import type { Vec3 } from '../../../src/sim/types'
 
@@ -19,23 +19,51 @@ const defaultTuning: StepTuning = {
   groundAccel: 10,
   airWishSpeed: 1,
   airAccel: 100,
+  grapple: { restLength: 5, stiffness: 40, damping: 4 },
 }
 
 const noIntent: MoveIntent = {
   wishDir: [0, 0, 0],
   wantsJump: false,
+  wantsCrouch: false,
 }
+
+const UP: Vec3 = [0, 1, 0]
+
+// Factory: build a CharacterState with sensible defaults. Tests only
+// supply the fields they actually care about; everything else is the
+// "at rest, standing on flat ground" baseline.
+const state = (overrides: Partial<CharacterState> = {}): CharacterState => ({
+  position: [0, 0, 0],
+  velocity: [0, 0, 0],
+  grounded: false,
+  groundNormal: UP,
+  grapple: { attached: false },
+  ...overrides,
+})
 
 type FakeBody = CharacterBody & {
   readonly lastDesired: () => Vec3 | null
   readonly callCount: () => number
 }
 
+// Scripted-response input: callers supply only the contact info; the
+// helper fills in `position` so existing tests don't need to repeat
+// a placeholder on every call site. Tests that care about position
+// can override it explicitly via the second arg.
+type ResponseInput =
+  | Readonly<{ grounded: false }>
+  | Readonly<{ grounded: true; groundNormal: Vec3 }>
+
 // Test adapter: a CharacterBody that records the desired move
 // and returns a scripted collision response.
-const fakeBody = (response: CollisionResponse): FakeBody => {
+const fakeBody = (
+  input: ResponseInput,
+  position: Vec3 = [0, 0, 0],
+): FakeBody => {
   let last: Vec3 | null = null
   let calls = 0
+  const response: CollisionResponse = { ...input, position }
   return {
     tryMove: (desired) => {
       last = desired
@@ -51,24 +79,18 @@ describe('stepCharacter (per-tick character integration)', () => {
   it('applies gravity to vertical velocity each tick', () => {
     const body = fakeBody({ grounded: false })
 
-    const next = stepCharacter(
-      { velocity: [0, 0, 0], grounded: false },
-      noIntent,
-      body,
-      defaultTuning,
-      1 / 60,
-    )
+    const next = stepCharacter(state(), noIntent, body, defaultTuning, 1 / 60)
 
     // vy += gravity * dt = -25 * (1/60) ≈ -0.4167
     expect(next.velocity[1]).toBeCloseTo(-25 / 60, 6)
   })
 
   it('jumps when grounded + wantsJump: sets vy to jumpSpeed and ungrounds', () => {
-    const body = fakeBody({ grounded: true })
+    const body = fakeBody({ grounded: true, groundNormal: UP })
 
     const next = stepCharacter(
-      { velocity: [0, 0, 0], grounded: true },
-      { wishDir: [0, 0, 0], wantsJump: true },
+      state({ grounded: true }),
+      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
       body,
       defaultTuning,
       1 / 60,
@@ -85,8 +107,8 @@ describe('stepCharacter (per-tick character integration)', () => {
     const body = fakeBody({ grounded: false })
 
     const next = stepCharacter(
-      { velocity: [0, 0, 0], grounded: false },
-      { wishDir: [0, 0, 0], wantsJump: true },
+      state(),
+      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
       body,
       defaultTuning,
       1 / 60,
@@ -97,10 +119,10 @@ describe('stepCharacter (per-tick character integration)', () => {
   })
 
   it('on ground branch: applies friction (horizontal velocity decays)', () => {
-    const body = fakeBody({ grounded: true })
+    const body = fakeBody({ grounded: true, groundNormal: UP })
 
     const next = stepCharacter(
-      { velocity: [8, 0, 0], grounded: true },
+      state({ velocity: [8, 0, 0], grounded: true }),
       noIntent,
       body,
       defaultTuning,
@@ -116,7 +138,7 @@ describe('stepCharacter (per-tick character integration)', () => {
     const body = fakeBody({ grounded: false })
 
     const next = stepCharacter(
-      { velocity: [8, 0, 0], grounded: false },
+      state({ velocity: [8, 0, 0] }),
       noIntent,
       body,
       defaultTuning,
@@ -132,7 +154,7 @@ describe('stepCharacter (per-tick character integration)', () => {
     const dt = 1 / 60
 
     stepCharacter(
-      { velocity: [4, 0, -3], grounded: false },
+      state({ velocity: [4, 0, -3] }),
       noIntent,
       body,
       defaultTuning,
@@ -148,10 +170,10 @@ describe('stepCharacter (per-tick character integration)', () => {
   })
 
   it('zeroes downward vy on landing (prevents gravity accumulation while grounded)', () => {
-    const body = fakeBody({ grounded: true })
+    const body = fakeBody({ grounded: true, groundNormal: UP })
 
     const next = stepCharacter(
-      { velocity: [0, -10, 0], grounded: false },
+      state({ velocity: [0, -10, 0] }),
       noIntent,
       body,
       defaultTuning,
@@ -164,14 +186,14 @@ describe('stepCharacter (per-tick character integration)', () => {
   })
 
   it('does not clamp upward vy on landing (a jump frame should rise)', () => {
-    const body = fakeBody({ grounded: true })
+    const body = fakeBody({ grounded: true, groundNormal: UP })
 
     // edge case: we're already moving up but body still reports grounded
     // (e.g. mid-jump, before kcc has registered separation).
     // Upward motion must survive.
     const next = stepCharacter(
-      { velocity: [0, 5, 0], grounded: true },
-      { wishDir: [0, 0, 0], wantsJump: true },
+      state({ velocity: [0, 5, 0], grounded: true }),
+      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
       body,
       defaultTuning,
       1 / 60,
@@ -186,15 +208,129 @@ describe('stepCharacter (per-tick character integration)', () => {
   it('calls body.tryMove exactly once per step', () => {
     const body = fakeBody({ grounded: false })
 
-    stepCharacter(
-      { velocity: [0, 0, 0], grounded: false },
-      noIntent,
+    stepCharacter(state(), noIntent, body, defaultTuning, 1 / 60)
+
+    expect(body.callCount()).toBe(1)
+  })
+
+  it('stores the groundNormal from the body response on the next state', () => {
+    const slope: Vec3 = [-0.5, 0.866, 0]
+    const body = fakeBody({ grounded: true, groundNormal: slope })
+
+    const next = stepCharacter(state(), noIntent, body, defaultTuning, 1 / 60)
+
+    expect(next.groundNormal[0]).toBeCloseTo(slope[0], 6)
+    expect(next.groundNormal[1]).toBeCloseTo(slope[1], 6)
+    expect(next.groundNormal[2]).toBeCloseTo(slope[2], 6)
+  })
+})
+
+describe('stepCharacter — slide branch (grounded + wantsCrouch)', () => {
+  const crouchIntent: MoveIntent = {
+    wishDir: [0, 0, 0],
+    wantsJump: false,
+    wantsCrouch: true,
+  }
+
+  it('skips ground friction on flat ground: horizontal momentum preserved', () => {
+    const body = fakeBody({ grounded: true, groundNormal: UP })
+
+    const next = stepCharacter(
+      state({ velocity: [8, 0, 0], grounded: true }),
+      crouchIntent,
       body,
       defaultTuning,
       1 / 60,
     )
 
-    expect(body.callCount()).toBe(1)
+    // ground branch friction reduces vx; the slide skips friction entirely
+    expect(next.velocity[0]).toBeCloseTo(8, 6)
+  })
+
+  it('projects velocity onto the slope tangent (gravity tangent → downslope accel)', () => {
+    // ramp tilted 25° around +Z: normal = (-sinθ, cosθ, 0)
+    const angle = (25 * Math.PI) / 180
+    const sn = Math.sin(angle)
+    const cn = Math.cos(angle)
+    const normal: Vec3 = [-sn, cn, 0]
+    const body = fakeBody({ grounded: true, groundNormal: normal })
+
+    const next = stepCharacter(
+      state({ grounded: true, groundNormal: normal }),
+      crouchIntent,
+      body,
+      defaultTuning,
+      1 / 60,
+    )
+
+    // After projecting gravity·dt onto the tangent plane, velocity gains
+    // a vector of magnitude |g|·sinθ·dt aligned with the downhill tangent
+    // (-cosθ, -sinθ, 0). Tolerance accounts for slide friction (small).
+    const dvMag = Math.abs(defaultTuning.gravity) * sn * (1 / 60)
+    expect(next.velocity[0]).toBeCloseTo(-cn * dvMag, 3)
+    expect(next.velocity[1]).toBeCloseTo(-sn * dvMag, 3)
+    expect(next.velocity[2]).toBeCloseTo(0, 6)
+  })
+
+  it('does not zero vy on landing while sliding (slope motion preserves slope vy)', () => {
+    const angle = (25 * Math.PI) / 180
+    const normal: Vec3 = [-Math.sin(angle), Math.cos(angle), 0]
+    const body = fakeBody({ grounded: true, groundNormal: normal })
+
+    // already sliding fast downhill with non-zero vy
+    const sliding: Vec3 = [-5, -2, 0]
+    const next = stepCharacter(
+      state({ velocity: sliding, grounded: true, groundNormal: normal }),
+      crouchIntent,
+      body,
+      defaultTuning,
+      1 / 60,
+    )
+
+    // vy must remain negative — the slope demands downward motion to stay on it
+    expect(next.velocity[1]).toBeLessThan(0)
+  })
+
+  it('crouch in air is ignored (no slide projection while ungrounded)', () => {
+    const body = fakeBody({ grounded: false })
+
+    const next = stepCharacter(
+      state({ velocity: [8, 0, 0] }),
+      crouchIntent,
+      body,
+      defaultTuning,
+      1 / 60,
+    )
+
+    // air branch ignores crouch; same as no-crouch air behaviour
+    expect(next.velocity[0]).toBeCloseTo(8, 6)
+    expect(next.velocity[1]).toBeCloseTo(-25 / 60, 6)
+  })
+})
+
+describe('stepCharacter — grapple composition', () => {
+  // Bullet (c) foundation: when state.grapple is attached, the damped
+  // spring acceleration from sim/grapple composes into velocity each
+  // tick. Anchor 10m along +x, restLength 5, stiffness 40 → extension
+  // 5, spring magnitude k·x = 200 along +x̂. Zero velocity means the
+  // damping term is zero, so dv = 200·dt cleanly.
+  it('applies grapple spring acceleration to velocity when attached', () => {
+    const body = fakeBody({ grounded: false })
+    const dt = 1 / 60
+
+    const next = stepCharacter(
+      state({
+        position: [0, 0, 0],
+        velocity: [0, 0, 0],
+        grapple: { attached: true, anchor: [10, 0, 0] },
+      }),
+      noIntent,
+      body,
+      defaultTuning,
+      dt,
+    )
+
+    expect(next.velocity[0]).toBeCloseTo(200 * dt, 6)
   })
 })
 
@@ -203,29 +339,29 @@ describe('stepCharacter — deterministic scenarios', () => {
     // Scripted: ground at y=0, jump on frame 0, then track vy over time.
     // With gravity=-25 and jumpSpeed=7.5, time to apex ≈ 7.5/25 = 0.3s = 18 frames.
     // At 60Hz, after ~18 ticks vy should hit zero (apex).
-    const body = fakeBody({ grounded: false })
-    let state = { velocity: [0, 0, 0] as Vec3, grounded: true }
+    const airBody = fakeBody({ grounded: false })
+    let s: CharacterState = state({ grounded: true })
 
     // tick 0: jump
-    state = stepCharacter(
-      state,
-      { wishDir: [0, 0, 0], wantsJump: true },
+    s = stepCharacter(
+      s,
+      { wishDir: [0, 0, 0], wantsJump: true, wantsCrouch: false },
       // for the jump tick, fake-body grounded=true (we're on the floor)
-      fakeBody({ grounded: true }),
+      fakeBody({ grounded: true, groundNormal: UP }),
       defaultTuning,
       1 / 60,
     )
     // jump sets vy=7.5, body says grounded (we haven't moved up yet visually)
     // but next tick we're airborne in the sim
-    state = { ...state, grounded: false }
+    s = { ...s, grounded: false }
 
     // simulate falling: 17 more frames, body says NOT grounded
     for (let i = 0; i < 17; i++) {
-      state = stepCharacter(state, noIntent, body, defaultTuning, 1 / 60)
+      s = stepCharacter(s, noIntent, airBody, defaultTuning, 1 / 60)
     }
 
     // after 17 ticks of gravity, vy = 7.5 + (-25)*(17/60) ≈ 7.5 - 7.083 ≈ 0.417
     // close to apex; one more tick crosses zero
-    expect(state.velocity[1]).toBeCloseTo(7.5 - 25 * (17 / 60), 4)
+    expect(s.velocity[1]).toBeCloseTo(7.5 - 25 * (17 / 60), 4)
   })
 })
