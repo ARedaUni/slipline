@@ -1,56 +1,31 @@
-import {
-  FLOOR_CENTER,
-  FLOOR_HALF_EXTENTS,
-  RAMP_ANGLE_RAD,
-  RAMP_CENTER,
-  RAMP_HALF_EXTENTS,
-  WALL_CENTER,
-  WALL_HALF_EXTENTS,
-} from '../engine/arena'
+import { ARENA, type ArenaPiece } from '../engine/arena'
 
-// Visual meshes mirror the collider dimensions from engine/arena.ts.
-// One source of truth — if the collider moves or resizes, the mesh follows.
+// One mesh per arena piece. Each piece is a convex box (Quake-style brush):
+// the same dimensions feed createArena's collider and this mesh's geometry,
+// so visual and physics geometry cannot drift apart.
 
-const full = (halfExtents: { x: number; y: number; z: number }) =>
-  [halfExtents.x * 2, halfExtents.y * 2, halfExtents.z * 2] as const
-
-const Floor = () => (
+const PieceMesh = ({ piece }: { piece: ArenaPiece }) => (
   <mesh
-    position={[FLOOR_CENTER.x, FLOOR_CENTER.y, FLOOR_CENTER.z]}
+    position={[piece.center.x, piece.center.y, piece.center.z]}
+    rotation={[0, 0, piece.rotationZ ?? 0]}
     receiveShadow
+    castShadow={piece.castShadow ?? true}
   >
-    <boxGeometry args={full(FLOOR_HALF_EXTENTS)} />
-    <meshStandardMaterial color="#2a2d36" />
-  </mesh>
-)
-
-const Ramp = () => (
-  <mesh
-    position={[RAMP_CENTER.x, RAMP_CENTER.y, RAMP_CENTER.z]}
-    rotation={[0, 0, RAMP_ANGLE_RAD]}
-    receiveShadow
-    castShadow
-  >
-    <boxGeometry args={full(RAMP_HALF_EXTENTS)} />
-    <meshStandardMaterial color="#4a6e8a" />
-  </mesh>
-)
-
-const Wall = () => (
-  <mesh
-    position={[WALL_CENTER.x, WALL_CENTER.y, WALL_CENTER.z]}
-    receiveShadow
-    castShadow
-  >
-    <boxGeometry args={full(WALL_HALF_EXTENTS)} />
-    <meshStandardMaterial color="#8a6e4a" />
+    <boxGeometry
+      args={[
+        piece.halfExtents.x * 2,
+        piece.halfExtents.y * 2,
+        piece.halfExtents.z * 2,
+      ]}
+    />
+    <meshStandardMaterial color={piece.color} />
   </mesh>
 )
 
 export const Arena = () => (
   <>
-    <Floor />
-    <Ramp />
-    <Wall />
+    {ARENA.map((piece) => (
+      <PieceMesh key={piece.id} piece={piece} />
+    ))}
   </>
 )
