@@ -67,6 +67,15 @@ export const grappleAcceleration = (
   return [radialAccel * ux, radialAccel * uy, radialAccel * uz]
 }
 
+// Falling-edge half of the hold-to-grapple input model. Detaching is a
+// pure state transition: no probe, no world query — the rope just lets
+// go. The signature carries that proof (no AnchorProbe parameter), so a
+// future change cannot quietly start consulting the world without a
+// type error at every call site.
+export const releaseGrapple = (_state: GrappleState): GrappleState => ({
+  attached: false,
+})
+
 // State transition: given a fire request, ask the AnchorProbe whether
 // the world offers something to attach to in that direction within
 // maxRange. On hit, the next state is attached at the hit point; on

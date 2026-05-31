@@ -5,6 +5,7 @@ import {
   type GrappleState,
   type GrappleTuning,
   grappleAcceleration,
+  releaseGrapple,
 } from '../../../src/sim/grapple'
 import type { Vec3 } from '../../../src/sim/types'
 
@@ -177,6 +178,22 @@ describe('fireGrapple', () => {
     const probe = fakeProbe({ found: false })
 
     const next = fireGrapple(state, [0, 0, 0], [0, 1, 0], 50, probe)
+
+    expect(next).toEqual({ attached: false })
+  })
+})
+
+// releaseGrapple is the falling-edge half of the hold-to-grapple input
+// model: while wantsAttach is true, fireGrapple resolves an anchor; when
+// wantsAttach transitions back to false, releaseGrapple drops it. The
+// signature deliberately omits the AnchorProbe — detaching is a pure
+// state transition that does not consult the world. The type system
+// carries that proof: no probe parameter, no possible world query.
+describe('releaseGrapple', () => {
+  it('detaches an attached grapple without consulting the probe', () => {
+    const state: GrappleState = { attached: true, anchor: [10, 5, 0] }
+
+    const next = releaseGrapple(state)
 
     expect(next).toEqual({ attached: false })
   })
