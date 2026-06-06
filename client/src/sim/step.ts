@@ -60,13 +60,13 @@ export type StepTuning = Readonly<{
 export const DEFAULT_TUNING: StepTuning = {
   gravity: -25,
   jumpSpeed: 7.5,
-  groundFriction: 6,
+  groundFriction: 4.1,
   groundStopSpeed: 1.5,
   groundWishSpeed: 8,
-  groundAccel: 10,
+  groundAccel: 42,
   airWishSpeed: 1,
   airAccel: 100,
-  grapple: { restLength: 5, stiffness: 40, damping: 4, maxRange: 20 },
+  grapple: { restLength: 5, stiffness: 65, damping: 4, maxRange: 20 },
 }
 
 // Removes the component of v perpendicular to n: v - (v·n)·n. On a
