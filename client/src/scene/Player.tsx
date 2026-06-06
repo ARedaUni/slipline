@@ -6,28 +6,12 @@ import { usePhysics } from '../engine/PhysicsContext'
 import { createRapierCharacterBody } from '../engine/rapierAdapter'
 import { createRapierAnchorProbe } from '../engine/rapierAnchorProbe'
 import { buildIntent } from '../sim/intent'
-import {
-  type CharacterState,
-  type StepTuning,
-  stepCharacter,
-} from '../sim/step'
+import { type CharacterState, DEFAULT_TUNING, stepCharacter } from '../sim/step'
 import { Grapple } from './Grapple'
 
 const FIXED_DT = 1 / 60
 const MAX_STEPS_PER_FRAME = 5
 const PLAYER_EYE_OFFSET = 0.7
-
-const TUNING: StepTuning = {
-  gravity: -25,
-  jumpSpeed: 7.5,
-  groundFriction: 6,
-  groundStopSpeed: 1.5,
-  groundWishSpeed: 8,
-  groundAccel: 10,
-  airWishSpeed: 1,
-  airAccel: 100,
-  grapple: { restLength: 5, stiffness: 40, damping: 4, maxRange: 20 },
-}
 
 const LOOP_OPTS = {
   dt: FIXED_DT,
@@ -85,7 +69,7 @@ export const Player = () => {
           intent,
           body,
           probe,
-          TUNING,
+          DEFAULT_TUNING,
           FIXED_DT,
         )
       },

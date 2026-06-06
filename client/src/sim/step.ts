@@ -53,6 +53,22 @@ export type StepTuning = Readonly<{
   grapple: GrappleTuning
 }>
 
+// Canonical starting point for designer-dialled numbers. Owned by the
+// sim (per CLAUDE.md: "Tuning lives in a StepTuning object owned by
+// the sim") so the engine layer can seed a runtime tuning store without
+// the scene reaching into the sim for magic numbers.
+export const DEFAULT_TUNING: StepTuning = {
+  gravity: -25,
+  jumpSpeed: 7.5,
+  groundFriction: 6,
+  groundStopSpeed: 1.5,
+  groundWishSpeed: 8,
+  groundAccel: 10,
+  airWishSpeed: 1,
+  airAccel: 100,
+  grapple: { restLength: 5, stiffness: 40, damping: 4, maxRange: 20 },
+}
+
 // Removes the component of v perpendicular to n: v - (v·n)·n. On a
 // slope, this turns "gravity straight down" into "gravity along the
 // surface tangent" — the downslope acceleration that drives sliding.
