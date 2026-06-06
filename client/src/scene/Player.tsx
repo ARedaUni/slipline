@@ -5,8 +5,9 @@ import { useInput } from '../engine/input/InputContext'
 import { usePhysics } from '../engine/PhysicsContext'
 import { createRapierCharacterBody } from '../engine/rapierAdapter'
 import { createRapierAnchorProbe } from '../engine/rapierAnchorProbe'
+import { useTuning } from '../engine/TuningContext'
 import { buildIntent } from '../sim/intent'
-import { type CharacterState, DEFAULT_TUNING, stepCharacter } from '../sim/step'
+import { type CharacterState, stepCharacter } from '../sim/step'
 import { Grapple } from './Grapple'
 
 const FIXED_DT = 1 / 60
@@ -21,6 +22,7 @@ const LOOP_OPTS = {
 export const Player = () => {
   const physics = usePhysics()
   const input = useInput()
+  const tuning = useTuning()
   const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
 
@@ -64,12 +66,15 @@ export const Player = () => {
           fireHeld: input.mouse.isFireHeld(),
         })
 
+        // Read tuning snapshot per tick — the HUD writes new snapshots
+        // via the store; Player never re-renders on tuning change because
+        // the read is inside useFrame, not the render body.
         stateRef.current = stepCharacter(
           stateRef.current,
           intent,
           body,
           probe,
-          DEFAULT_TUNING,
+          tuning.get(),
           FIXED_DT,
         )
       },
