@@ -11,6 +11,7 @@ import {
   type StepTuning,
   stepCharacter,
 } from '../sim/step'
+import { Grapple } from './Grapple'
 
 const FIXED_DT = 1 / 60
 const MAX_STEPS_PER_FRAME = 5
@@ -105,5 +106,5 @@ export const Player = () => {
     return () => canvas.removeEventListener('click', onClick)
   }, [gl, input.mouse])
 
-  return null
+  return <Grapple stateRef={stateRef} />
 }
