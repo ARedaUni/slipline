@@ -6,6 +6,9 @@ import { createKeyboard } from './engine/input/keyboard'
 import { createMouse } from './engine/input/mouse'
 import { PhysicsProvider } from './engine/PhysicsContext'
 import { createPhysicsWorld } from './engine/physicsWorld'
+import { TuningProvider } from './engine/TuningContext'
+import { createTuningStore } from './engine/tuning'
+import { DEFAULT_TUNING } from './sim/step'
 import './index.css'
 
 const rootElement = document.getElementById('root')
@@ -18,12 +21,15 @@ const input = {
   keyboard: createKeyboard(),
   mouse: createMouse(),
 }
+const tuning = createTuningStore(DEFAULT_TUNING)
 
 createRoot(rootElement).render(
   <StrictMode>
     <PhysicsProvider value={world}>
       <InputProvider value={input}>
-        <App />
+        <TuningProvider value={tuning}>
+          <App />
+        </TuningProvider>
       </InputProvider>
     </PhysicsProvider>
   </StrictMode>,
