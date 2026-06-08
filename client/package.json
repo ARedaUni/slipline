@@ -38,22 +38,22 @@
     "three": "^0.184.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
+    "@biomejs/biome": "2.4.15",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@types/node": "^24.12.3",
+    "@testing-library/jest-dom": "6.9.1",
+    "@types/node": "24.12.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@types/three": "^0.184.1",
+    "@types/three": "0.184.1",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/browser-playwright": "^4.1.6",
     "@vitest/coverage-v8": "^4.1.6",
-    "license-checker-rseidelsohn": "^4.4.2",
-    "playwright": "^1.60.0",
+    "license-checker-rseidelsohn": "4.4.2",
+    "playwright": "1.60.0",
     "typescript": "~6.0.2",
     "vite": "^8.0.12",
     "vitest": "^4.1.6",
-    "vitest-browser-react": "^2.2.0"
+    "vitest-browser-react": "2.2.0"
   }
 }
