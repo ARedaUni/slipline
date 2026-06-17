@@ -52,7 +52,7 @@
     "license-checker-rseidelsohn": "^4.4.2",
     "playwright": "^1.60.0",
     "typescript": "~6.0.2",
-    "vite": "^8.0.12",
+    "vite": "^8.0.16",
     "vitest": "^4.1.6",
     "vitest-browser-react": "^2.2.0"
   }
