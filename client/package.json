@@ -49,7 +49,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/browser-playwright": "^4.1.6",
     "@vitest/coverage-v8": "^4.1.6",
-    "license-checker-rseidelsohn": "^4.4.2",
+    "license-checker-rseidelsohn": "^5.0.0",
     "playwright": "^1.60.0",
     "typescript": "~6.0.2",
     "vite": "^8.0.12",
