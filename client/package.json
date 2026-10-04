@@ -27,7 +27,7 @@
       "esbuild"
     ],
     "overrides": {
-      "qs@<6.15.2": ">=6.15.2"
+      "qs@<6.15.2": ">=6.16.0"
     }
   },
   "dependencies": {
